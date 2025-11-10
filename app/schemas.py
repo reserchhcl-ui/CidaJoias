@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
-
+from typing import List
+from datetime import datetime
 # Este será o "schema" que a API retornará ao listar produtos.
 # Note que ele NÃO é o modelo do SQLAlchemy, é um modelo Pydantic.
 class ProductBase(BaseModel):
@@ -62,3 +63,65 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     email: str | None = None
+
+# --- Schemas de Encomendas (Orders) ---
+
+# Schema para um item individual DENTRO de uma encomenda
+class OrderItemBase(BaseModel):
+    product_id: int
+    quantity: int = Field(..., gt=0) # Quantidade deve ser maior que zero
+
+# Schema para a criação de uma encomenda (o que recebemos no POST)
+class OrderCreate(BaseModel):
+    items: List[OrderItemBase]
+
+# --- Schemas de Resposta ---
+
+# Schema para um item dentro da resposta da API
+class OrderItemResponse(OrderItemBase):
+    id: int
+    price_at_purchase: float # Usamos float na API para ser compatível com JSON
+
+    class Config:
+        from_attributes = True
+
+# Schema completo para a resposta da API (a encomenda criada)
+class OrderResponse(BaseModel):
+    id: int
+    user_id: int
+    status: str
+    items: List[OrderItemResponse] = []
+
+    class Config:
+        from_attributes = True
+
+class SalesCaseItemResponse(BaseModel):
+    product_id: int
+    quantity: int
+
+    class Config:
+        from_attributes = True
+
+class SalesCaseResponse(BaseModel):
+    id: int
+    sales_rep_id: int
+    loan_date: datetime
+    return_by_date: datetime
+    status: str # O Enum será convertido para string
+    items: List[SalesCaseItemResponse] = []
+    # Poderíamos incluir detalhes da vendedora aqui se quiséssemos
+    # sales_rep: User 
+
+    class Config:
+        from_attributes = True
+
+# --- Schemas para o Corpo do Pedido (o que o cliente envia) ---
+
+class SalesCaseItemCreate(BaseModel):
+    product_id: int
+    quantity: int = Field(..., gt=0, description="Quantity must be greater than zero")
+
+class SalesCaseCreate(BaseModel):
+    sales_rep_id: int
+    loan_duration_days: int = Field(..., gt=0, le=90, description="Duration in days (1-90)")
+    items: List[SalesCaseItemCreate]
