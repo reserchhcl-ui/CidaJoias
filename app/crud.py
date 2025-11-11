@@ -2,7 +2,9 @@
 
 from sqlalchemy.orm import Session,joinedload
 from . import models, schemas
-from .auth import get_password_hash
+from .security import get_password_hash
+from datetime import datetime, timedelta
+from .models import UserRole
 
 # --- CRUD para Users ---
 
@@ -132,3 +134,69 @@ def get_product_by_barcode(db: Session, barcode: str):
     if not barcode:
         return None
     return db.query(models.Product).filter(models.Product.barcode == barcode).first()
+
+def create_sales_case(db: Session, case_create: schemas.SalesCaseCreate):
+    """
+    Cria um novo estojo de vendas. Operação transacional e segura.
+    1. Valida a vendedora.
+    2. Valida a disponibilidade de stock para cada produto.
+    3. Cria o estojo e os seus itens.
+    4. Atualiza o stock 'on_loan' de cada produto.
+    Tudo dentro de uma transação: ou tudo funciona, ou nada é salvo.
+    """
+    # Usamos um bloco try/except para garantir a atomicidade com db.rollback()
+    try:
+        # 1. Validar a vendedora (Sales Rep)
+        sales_rep = db.query(models.User).filter(
+            models.User.id == case_create.sales_rep_id,
+            models.User.role == UserRole.SALES_REP
+        ).first()
+
+        if not sales_rep:
+            raise ValueError(f"Sales representative with id {case_create.sales_rep_id} not found or is not a sales_rep.")
+
+        # 2. Validar o stock de TODOS os produtos ANTES de qualquer alteração
+        for item in case_create.items:
+            product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+            if not product:
+                raise ValueError(f"Product with id {item.product_id} not found.")
+            
+            available_stock = product.stock_quantity - product.on_loan_quantity
+            if available_stock < item.quantity:
+                raise ValueError(f"Insufficient available stock for product '{product.name}' (ID: {product.id}). Available: {available_stock}, Requested: {item.quantity}")
+
+        # 3. Criar o registo principal do Estojo (SalesCase)
+        return_by_date = datetime.utcnow() + timedelta(days=case_create.loan_duration_days)
+        db_case = models.SalesCase(
+            sales_rep_id=case_create.sales_rep_id,
+            return_by_date=return_by_date
+        )
+        db.add(db_case)
+        db.flush() # Para obter o db_case.id para os itens
+
+        # 4. Criar os Itens do Estojo e ATUALIZAR o stock 'on_loan'
+        for item in case_create.items:
+            # Re-buscar o produto para garantir que estamos a trabalhar com o objeto da sessão
+            product_to_update = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+            
+            # Criar o item do estojo
+            db_case_item = models.SalesCaseItem(
+                case_id=db_case.id,
+                product_id=item.product_id,
+                quantity=item.quantity
+            )
+            db.add(db_case_item)
+            
+            # Atualizar o inventário
+            product_to_update.on_loan_quantity += item.quantity
+
+        # 5. Se tudo correu bem, confirmar a transação
+        db.commit()
+        db.refresh(db_case)
+        return db_case
+
+    except ValueError as e:
+        # 6. Se qualquer validação falhou, reverter TODAS as alterações
+        db.rollback()
+        # Re-levantar a exceção para que o endpoint a possa tratar
+        raise e

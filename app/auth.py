@@ -1,15 +1,13 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 # Importar nossos modelos e schemas
-from . import models, schemas, database
+from . import models, schemas, database, crud
+from .models import UserRole
 
-# --- Configuração de Criptografia de Senha (Hashing) ---
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # --- Configuração do JWT (Token) ---
 # (Em produção, estas chaves DEVEM estar no seu .env!)
@@ -19,16 +17,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 # Token expira em 60 minutos
 
 # Define o "esquema" de autenticação
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-# --- Funções de Segurança ---
-
-def verify_password(plain_password, hashed_password):
-    """Verifica se a senha em texto plano bate com o hash salvo."""
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password):
-    """Gera o hash de uma senha em texto plano."""
-    return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     """Cria um novo token JWT."""
@@ -42,10 +30,6 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 # --- Dependências (Dependencies) ---
-
-def get_user(db: Session, email: str):
-    """Busca um usuário pelo email no banco de dados."""
-    return db.query(models.User).filter(models.User.email == email).first()
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(database.get_db)):
     """
@@ -66,7 +50,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     except JWTError:
         raise credentials_exception
     
-    user = get_user(db, email=token_data.email)
+    user = crud.get_user_by_email(db, email=token_data.email)
+    
     if user is None:
         raise credentials_exception
     return user
@@ -81,3 +66,20 @@ async def get_current_admin_user(current_user: schemas.User = Depends(get_curren
             detail="The user does not have administrative privileges"
         )
     return current_user
+
+def require_role(required_role: UserRole):
+    """
+    Uma fábrica de dependências que cria uma dependência para um 'role' específico.
+    """
+    def role_checker(current_user: models.User = Depends(get_current_user)):
+        if current_user.role != required_role:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"User does not have the required '{required_role.value}' privilege"
+            )
+        return current_user
+    return role_checker
+
+# Agora podemos criar dependências específicas e reutilizáveis
+require_admin_user = require_role(UserRole.ADMIN)
+require_sales_rep_user = require_role(UserRole.SALES_REP)
