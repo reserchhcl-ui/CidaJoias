@@ -150,3 +150,10 @@ class SalesCaseReturnReport(BaseModel):
     total_items_sold: int
     total_value_sold: float
     items_summary: List[ItemReturnSummary]
+
+class CheckoutItem(BaseModel):
+    product_id: int
+    quantity: int = Field(..., gt=0, description="Quantity must be greater than zero")
+
+class CheckoutRequest(BaseModel):
+    items: List[CheckoutItem]

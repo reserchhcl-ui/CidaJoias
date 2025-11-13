@@ -337,3 +337,83 @@ def process_sales_case_return(db: Session, case_id: int, return_request: schemas
     except (ValueError, PermissionError) as e:
         db.rollback()
         raise e
+    
+def create_customer_order(db: Session, user: models.User, checkout_request: schemas.CheckoutRequest):
+    """
+    Cria uma nova encomenda para um cliente. Operação ATÓMICA e SEGURA.
+    - Valida o stock disponível (stock_quantity - on_loan_quantity).
+    - Cria a Order e os OrderItems.
+    - Deduz o stock físico (stock_quantity).
+    - Reverte TUDO em caso de qualquer falha.
+    """
+    try:
+        # --- FASE 1: VALIDAÇÃO PRÉVIA (SEM ALTERAÇÕES NA BD) ---
+        products_to_update = []
+        for item in checkout_request.items:
+            # Lock pessimista: garante que a linha do produto não é alterada por outra transação
+            # enquanto esta está a decorrer. Nível de produção para evitar race conditions.
+            product = db.query(models.Product).filter(models.Product.id == item.product_id).with_for_update().first()
+
+            if not product:
+                raise ValueError(f"Product with id {item.product_id} not found.")
+
+            available_stock = product.stock_quantity - product.on_loan_quantity
+            if item.quantity > available_stock:
+                raise ValueError(f"Insufficient stock for product '{product.name}'. Requested: {item.quantity}, Available: {available_stock}")
+            
+            products_to_update.append({"product": product, "quantity_sold": item.quantity})
+
+        # --- FASE 2: EXECUÇÃO (COM ALTERAÇÕES NA BD) ---
+        # Se todas as validações passaram, procedemos.
+        
+        # 5. Registo e Arquivo (Pedido)
+        db_order = models.Order(user_id=user.id, status="processing")
+        db.add(db_order)
+        db.flush() # Necessário para obter o db_order.id
+
+        # 4 & 5. Execução da Venda e Registo dos Itens
+        for data in products_to_update:
+            product = data["product"]
+            quantity_sold = data["quantity_sold"]
+
+            # Criar o OrderItem com o preço congelado
+            order_item = models.OrderItem(
+                order_id=db_order.id,
+                product_id=product.id,
+                quantity=quantity_sold,
+                price_at_purchase=product.price
+            )
+            db.add(order_item)
+            
+            # Deduzir o inventário físico
+            product.stock_quantity -= quantity_sold
+
+        # Se tudo correu bem até aqui, a transação é confirmada
+        db.commit()
+        db.refresh(db_order)
+        return db_order
+
+    except ValueError as e:
+        # 2. Atomicidade Absoluta: Reverte a transação inteira
+        db.rollback()
+        raise e
+    
+def get_orders_by_customer(db: Session, user_id: int, skip: int = 0, limit: int = 100):
+    """
+    Busca uma lista paginada de encomendas para um cliente específico.
+    - Filtra estritamente pelo user_id para garantir segurança.
+    - Usa 'joinedload' para carregar os itens e produtos de forma otimizada,
+      evitando o problema N+1.
+    """
+    return (
+        db.query(models.Order)
+        .filter(models.Order.user_id == user_id)  # <-- Ponto de segurança CRÍTICO
+        .order_by(models.Order.id.desc())         # Pedidos mais recentes primeiro
+        .options(
+            joinedload(models.Order.items)        # Carrega os OrderItems
+            .joinedload(models.OrderItem.product) # E os Produtos associados a cada item
+        )
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )

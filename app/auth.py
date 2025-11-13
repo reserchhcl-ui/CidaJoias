@@ -85,3 +85,4 @@ def require_role(required_roles: List[UserRole]):
 require_admin_user = require_role([UserRole.ADMIN])
 require_sales_rep_user = require_role([UserRole.SALES_REP])
 require_admin_or_sales_rep = require_role([UserRole.ADMIN, UserRole.SALES_REP])
+require_customer_user = require_role([UserRole.CUSTOMER])
