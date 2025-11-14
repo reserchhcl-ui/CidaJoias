@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 from typing import List
 
 # Usamos '..' para importar de diretórios pais
-from .. import models, schemas, auth, crud
+from .. import models, schemas, auth
 from ..database import get_db
-
+from ..crud import *
 # 1. Criamos um "router"
 # Isto funciona como uma "mini" app FastAPI
 router = APIRouter(
@@ -17,7 +17,7 @@ router = APIRouter(
 
 @router.get("/", response_model=List[schemas.Product])
 def read_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    products = crud.get_products(db, skip=skip, limit=limit)
+    products = crud_product.get_products(db, skip=skip, limit=limit)
     return products
 
 @router.post("/", response_model=schemas.Product, status_code=status.HTTP_201_CREATED)
@@ -26,9 +26,9 @@ def create_product_endpoint(
     db: Session = Depends(get_db),
     current_admin: models.User = Depends(auth.get_current_admin_user)
 ):
-    if crud.get_product_by_barcode(db, barcode=product.barcode):
+    if crud_product.get_product_by_barcode(db, barcode=product.barcode):
         raise HTTPException(status_code=400, detail="Barcode already registered")
-    return crud.create_product(db=db, product=product)
+    return crud_product.create_product(db=db, product=product)
 
 @router.get("/{product_id}", response_model=schemas.Product)
 def read_product(
@@ -36,7 +36,7 @@ def read_product(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_admin_user)
 ):
-    db_product = crud.get_product(db=db, product_id=product_id)
+    db_product = crud_product.get_product(db=db, product_id=product_id)
     if db_product is None:
         raise HTTPException(status_code=404, detail="Product not found")
     return db_product
@@ -48,10 +48,10 @@ def update_product_endpoint(
     db: Session = Depends(get_db),
     current_admin: models.User = Depends(auth.get_current_admin_user)
 ):
-    db_product = crud.get_product(db=db, product_id=product_id)
+    db_product = crud_product.get_product(db=db, product_id=product_id)
     if db_product is None:
         raise HTTPException(status_code=404, detail="Product not found")
-    return crud.update_product(db=db, db_product=db_product, product_update=product_update)
+    return crud_product.update_product(db=db, db_product=db_product, product_update=product_update)
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_product_endpoint(
@@ -59,10 +59,10 @@ def delete_product_endpoint(
     db: Session = Depends(get_db),
     current_admin: models.User = Depends(auth.get_current_admin_user)
 ):
-    db_product = crud.get_product(db=db, product_id=product_id)
+    db_product = crud_product.get_product(db=db, product_id=product_id)
     if db_product is None:
         raise HTTPException(status_code=404, detail="Product not found")
-    crud.delete_product(db=db, db_product=db_product)
+    crud_product.delete_product(db=db, db_product=db_product)
     return None
 
 @router.get("/barcode/{barcode}", response_model=schemas.Product)
@@ -75,7 +75,7 @@ def read_product_by_barcode(
     Obtém os detalhes de um produto específico pelo seu código de barras.
     Requer privilégios de administrador. Ideal para a app de gestão de stock.
     """
-    db_product = crud.get_product_by_barcode(db, barcode=barcode)
+    db_product = crud_product.get_product_by_barcode(db, barcode=barcode)
 
     if db_product is None:
         raise HTTPException(
