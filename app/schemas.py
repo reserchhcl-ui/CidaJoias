@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field,ConfigDict
+from .models import UserRole
 from typing import List,Optional
 from datetime import datetime
 # Este será o "schema" que a API retornará ao listar produtos.
@@ -17,8 +18,7 @@ class Product(ProductBase):
 
     # Configuração para dizer ao Pydantic para ler os dados
     # mesmo que não seja um dict, mas sim um objeto ORM (SQLAlchemy)
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ProductCreate(BaseModel):
     name: str
@@ -45,15 +45,15 @@ class UserCreate(UserBase):
         min_length=8,  # Boa prática: exigir senha com pelo menos 8 caracteres
         max_length=999  # Nosso escudo: recusa senhas > 72 caracteres
     )
-    is_admin: bool = False
+    role: UserRole = UserRole.CUSTOMER
 
 # Schema para ler/retornar um usuário (NUNCA retorne a senha)
 class User(UserBase):
     id: int
-    is_admin: bool
+    role: UserRole
 
-    class Config:
-        from_attributes = True
+
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Schemas de Autenticação ---
 
@@ -82,8 +82,7 @@ class OrderItemResponse(OrderItemBase):
     id: int
     price_at_purchase: float # Usamos float na API para ser compatível com JSON
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Schema completo para a resposta da API (a encomenda criada)
 class OrderResponse(BaseModel):
@@ -92,15 +91,13 @@ class OrderResponse(BaseModel):
     status: str
     items: List[OrderItemResponse] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SalesCaseItemResponse(BaseModel):
     product_id: int
     quantity: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SalesCaseResponse(BaseModel):
     id: int
@@ -112,8 +109,8 @@ class SalesCaseResponse(BaseModel):
     # Poderíamos incluir detalhes da vendedora aqui se quiséssemos
     # sales_rep: User 
 
-    class Config:
-        from_attributes = True
+
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Schemas para o Corpo do Pedido (o que o cliente envia) ---
 

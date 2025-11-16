@@ -17,13 +17,13 @@ class SalesCaseService:
 
     def create_new_case(self, *, case_create: schemas.SalesCaseCreate) -> models.SalesCase:
         # --- FASE 1: VALIDAÇÕES DE NEGÓCIO ---
-        sales_rep = crud.user.get_by_id(self.db, user_id=case_create.sales_rep_id)
+        sales_rep = crud.crud_user.user.get(self.db, user_id=case_create.sales_rep_id)
         if not sales_rep or sales_rep.role != UserRole.SALES_REP:
             raise SalesCaseLogicError(f"Sales representative with id {case_create.sales_rep_id} not found or is not a sales_rep.")
 
         products_to_loan = []
         for item in case_create.items:
-            product = crud.product.get(self.db, product_id=item.product_id)
+            product = crud.crud_product.get_product(self.db, product_id=item.product_id)
             if not product:
                 raise SalesCaseLogicError(f"Product with id {item.product_id} not found.")
             
@@ -41,7 +41,7 @@ class SalesCaseService:
                 product = item_data["product"]
                 quantity = item_data["quantity"]
                 crud.sales_case.create_item(self.db, case_id=db_case.id, product_id=product.id, quantity=quantity)
-                crud.product.update_stock(self.db, db_product=product, change_in_stock=0, change_in_loan=+quantity)
+                crud.crud_product.update_product(self.db, db_product=product, change_in_stock=0, change_in_loan=+quantity)
             
             self.db.commit()
             self.db.refresh(db_case)
@@ -75,7 +75,7 @@ class SalesCaseService:
             
             for product_id, quantity_loaned in loaned_items_map.items():
                 quantity_sold = items_sold_map.get(product_id, 0)
-                product = crud.product.get(self.db, product_id=product_id)
+                product = crud.crud_product.get_product(self.db, product_id=product_id)
                 crud.product.update_stock(self.db, db_product=product, change_in_stock=-quantity_sold, change_in_loan=-quantity_loaned)
                 
                 subtotal = quantity_sold * float(product.price)
@@ -88,7 +88,7 @@ class SalesCaseService:
             
             new_order_id = None
             if total_items_sold > 0:
-                new_order = crud.order.create_order(self.db, user_id=db_case.sales_rep_id, status="completed_by_sales_rep")
+                new_order = crud.crud_order.create_order(self.db, user_id=db_case.sales_rep_id, status="completed_by_sales_rep")
                 for item_sold in return_request.items_sold:
                     if item_sold.quantity_sold > 0:
                         product = crud.product.get(self.db, product_id=item_sold.product_id)
@@ -96,7 +96,7 @@ class SalesCaseService:
                                                      quantity=item_sold.quantity_sold, price_at_purchase=product.price)
                 new_order_id = new_order.id
 
-            crud.sales_case.update_status(self.db, db_case=db_case, status=SalesCaseStatus.RETURNED)
+            crud.crud_sales_case.sales_case.update_status(self.db, db_case=db_case, status=SalesCaseStatus.RETURNED)
             self.db.commit()
 
             return schemas.SalesCaseReturnReport(

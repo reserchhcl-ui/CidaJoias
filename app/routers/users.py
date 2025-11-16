@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from datetime import timedelta
 
 from .. import models, schemas, auth, crud,security
+
 from ..database import get_db
 
 router = APIRouter(
@@ -14,17 +15,17 @@ router = APIRouter(
 
 @router.post("/users/register", response_model=schemas.User, status_code=status.HTTP_201_CREATED)
 def create_user_endpoint(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    db_user = crud.get_user_by_email(db, email=user.email)
+    db_user = crud.crud_user.user.get_by_email(db, email=user.email)
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
-    return crud.create_user(db=db, user=user)
+    return crud.crud_user.user.create(db=db, obj_in=user)
 
 @router.post("/token", response_model=schemas.Token)
 async def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(), 
     db: Session = Depends(get_db)
 ):
-    user = crud.get_user_by_email(db, email=form_data.username)
+    user = crud.crud_user.user.get_by_email(db, email=form_data.username)
     if not user or not security.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
