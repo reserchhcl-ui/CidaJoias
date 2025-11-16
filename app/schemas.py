@@ -2,12 +2,13 @@ from pydantic import BaseModel, Field,ConfigDict
 from .models import UserRole
 from typing import List,Optional
 from datetime import datetime
+from decimal import Decimal
 # Este será o "schema" que a API retornará ao listar produtos.
 # Note que ele NÃO é o modelo do SQLAlchemy, é um modelo Pydantic.
 class ProductBase(BaseModel):
     name: str
     description: str | None = None # Permite que seja Nulo (Python 3.10+)
-    price: float
+    selling_price: Decimal
     stock_quantity: int
     image_url: str | None = None
 
@@ -15,15 +16,16 @@ class ProductBase(BaseModel):
 class Product(ProductBase):
     id: int
     barcode: str | None = None
+    current_price: Decimal 
+    cost_price: Decimal # Admins podem querer ver isso
 
-    # Configuração para dizer ao Pydantic para ler os dados
-    # mesmo que não seja um dict, mas sim um objeto ORM (SQLAlchemy)
     model_config = ConfigDict(from_attributes=True)
 
 class ProductCreate(BaseModel):
     name: str
     description: str | None = None
-    price: float
+    selling_price: Decimal = Field(..., gt=0)
+    cost_price: Decimal = Field(..., gt=0) # Preço de custo é obrigatório
     stock_quantity: int = 0
     barcode: str | None = None
     image_url: str | None = None
@@ -154,3 +156,21 @@ class CheckoutItem(BaseModel):
 
 class CheckoutRequest(BaseModel):
     items: List[CheckoutItem]
+
+class DiscountBase(BaseModel):
+    product_id: int
+    discount_price: Decimal
+    end_time: datetime
+
+class DiscountCreate(DiscountBase):
+    pass # Por enquanto, o mesmo que a base
+
+class Discount(DiscountBase):
+    id: int
+    start_time: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class DiscountUpdate(BaseModel):
+    discount_price: Optional[Decimal] = None
+    end_time: Optional[datetime] = None

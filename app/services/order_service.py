@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from .. import models, schemas
 from ..crud import crud_product, crud_order # Importamos nossas ferramentas
-
+from .pricing_engine import PricingEngine
 
 class OrderCreationError(ValueError):
     """Exceção customizada para erros na criação de pedidos."""
@@ -12,6 +12,7 @@ class OrderService:
     def __init__(self, db: Session):
         # O serviço recebe a sessão do banco ao ser instanciado
         self.db = db
+        self.pricing_engine = PricingEngine(db)
 
     def create_customer_order(self, user: models.User, checkout_request: schemas.CheckoutRequest) -> models.Order:
         """
@@ -44,14 +45,14 @@ class OrderService:
             for data in products_to_process:
                 product = data["product"]
                 quantity_sold = data["quantity_sold"]
-
+                price_at_purchase = self.pricing_engine.get_current_price_for_product(product=product)
                 # Criar o item do pedido
                 crud_order.create_order_item(
                     self.db,
                     order_id=db_order.id,
                     product_id=product.id,
                     quantity=quantity_sold,
-                    price_at_purchase=product.price
+                    price_at_purchase=price_at_purchase 
                 )
                 
                 # Deduzir do inventário

@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+from ..services.pricing_engine import PricingEngine
 
 # Usamos '..' para importar de diretórios pais
 from .. import models, schemas, auth
@@ -15,10 +16,34 @@ router = APIRouter(
     tags=["Products"]    # 3. Agrupa os endpoints na documentação do Swagger
 )
 
+def get_pricing_engine(db: Session = Depends(get_db)):
+    return PricingEngine(db=db)
+
 @router.get("/", response_model=List[schemas.Product])
 def read_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     products = crud_product.get_products(db, skip=skip, limit=limit)
     return products
+
+@router.get("/", response_model=List[schemas.Product])
+def read_products(
+    skip: int = 0, limit: int = 100, 
+    db: Session = Depends(get_db),
+    pricing_engine: PricingEngine = Depends(get_pricing_engine)
+):
+    products_from_db = crud_product.get_products(db, skip=skip, limit=limit)
+    
+    # Enriquecer cada produto com o preço atual
+    products_with_prices = []
+    # Otimização: buscar todos os preços de uma vez
+    current_prices = pricing_engine.get_current_prices_for_products(products=products_from_db)
+
+    for product in products_from_db:
+        # Pydantic não consegue fazer isso sozinho, então criamos um dict
+        product_data = schemas.Product.model_validate(product).model_dump()
+        product_data["current_price"] = current_prices.get(product.id, product.selling_price)
+        products_with_prices.append(product_data)
+
+    return products_with_prices
 
 @router.post("/", response_model=schemas.Product, status_code=status.HTTP_201_CREATED)
 def create_product_endpoint(
