@@ -48,7 +48,8 @@ class Product(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     description = Column(String)
-    price = Column(DECIMAL(10, 2), nullable=False)
+    selling_price = Column(DECIMAL(10, 2), nullable=False) # Preço de venda padrão
+    cost_price = Column(DECIMAL(10, 2), nullable=False)    # Preço de custo (regra de negócio)
     
     # ## --- ALTERAÇÃO ---
     # Agora temos um controlo de inventário mais detalhado.
@@ -60,8 +61,19 @@ class Product(Base):
     
     # Relações
     order_items = relationship("OrderItem", back_populates="product")
+    discounts = relationship("Discount", back_populates="product", cascade="all, delete-orphan")
 
 # --- MODELOS DE ENCOMENDA (Sem alterações, mas incluídos para o ficheiro completo) ---
+class Discount(Base):
+    __tablename__ = "discounts"
+
+    id = Column(Integer, primary_key=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
+    discount_price = Column(DECIMAL(10, 2), nullable=False)
+    start_time = Column(DateTime(timezone=True), server_default=func.now())
+    end_time = Column(DateTime(timezone=True), nullable=False)
+
+    product = relationship("Product", back_populates="discounts")
 
 class Order(Base):
     __tablename__ = "orders"

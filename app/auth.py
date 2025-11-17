@@ -7,14 +7,16 @@ from typing import List
 # Importar nossos modelos e schemas
 from . import models, schemas, database, crud
 from .models import UserRole
-
+from .core.config import settings
 
 # --- Configuração do JWT (Token) ---
 # (Em produção, estas chaves DEVEM estar no seu .env!)
-SECRET_KEY = "yZXRvcnNvGEU" # Troque por uma string aleatória
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 # Token expira em 60 minutos
-
+# SECRET_KEY = "yZXRvcnNvGEU" # Troque por uma string aleatória
+# ALGORITHM = "HS256"
+# ACCESS_TOKEN_EXPIRE_MINUTES = 60 # Token expira em 60 minutos
+SECRET_KEY = settings.SECRET_KEY
+ALGORITHM = settings.ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 # Define o "esquema" de autenticação
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 

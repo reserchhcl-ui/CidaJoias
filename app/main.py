@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from . import models
 from .database import engine
-from .routers import products, users, orders, sales_cases# 1. Importar os nossos novos routers
+from .routers import products, users, orders, sales_cases,discounts# 1. Importar os nossos novos routers
 
 # Cria as tabelas no banco de dados (se não existirem)
 #models.Base.metadata.create_all(bind=engine)
@@ -18,7 +18,7 @@ app.include_router(users.router)
 app.include_router(products.router)
 app.include_router(orders.router)
 app.include_router(sales_cases.router)
-
+app.include_router(discounts.router)
 @app.get("/")
 def read_root():
     """
