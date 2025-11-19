@@ -1,7 +1,6 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
-from .. import models, schemas
-from ..crud import crud_product, crud_order # Importamos nossas ferramentas
+from .. import models, schemas, crud# Importamos nossas ferramentas
 from .pricing_engine import PricingEngine
 
 class OrderCreationError(ValueError):
@@ -24,7 +23,7 @@ class OrderService:
             products_to_process = []
             for item in checkout_request.items:
                 # Usamos a ferramenta do crud_product para pegar e "travar" o produto
-                product = crud_product.get_product_for_update(self.db, product_id=item.product_id)
+                product = crud.product.get_for_update(self.db, product_id=item.product_id)
 
                 if not product:
                     raise ValueError(f"Produto com id {item.product_id} não encontrado.")
@@ -39,7 +38,7 @@ class OrderService:
             # Se todas as validações passaram, começamos a alterar o banco.
             
             # Criar o pedido principal
-            db_order = crud_order.create_order(self.db, user_id=user.id, status="processing")
+            db_order = crud.order.create_order(self.db, user_id=user.id, status="processing")
 
             # Criar os itens e atualizar o estoque
             for data in products_to_process:
@@ -47,7 +46,7 @@ class OrderService:
                 quantity_sold = data["quantity_sold"]
                 price_at_purchase = self.pricing_engine.get_current_price_for_product(product=product)
                 # Criar o item do pedido
-                crud_order.create_order_item(
+                crud.order.create_order_item(
                     self.db,
                     order_id=db_order.id,
                     product_id=product.id,
@@ -56,7 +55,7 @@ class OrderService:
                 )
                 
                 # Deduzir do inventário
-                crud_product.decrease_stock(self.db, product=product, quantity=quantity_sold)
+                crud.product.decrease_stock(self.db, product=product, quantity=quantity_sold)
 
             # Se chegamos até aqui sem erros, confirmamos tudo.
             self.db.commit()

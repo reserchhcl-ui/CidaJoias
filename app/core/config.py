@@ -10,12 +10,12 @@ class Settings(BaseSettings):
     # O Pydantic automaticamente tentará carregar a variável de ambiente DATABASE_URL.
     # Podemos fornecer um valor padrão para segurança.
     DATABASE_URL: str = "sqlite:///./default.db"
-
+    #DATABASE_URL: str ="postgresql://postgres:84141039@localhost:5432/CidaJoias-db"
     # --- Configurações de JWT (Autenticação) ---
-    SECRET_KEY: str = "super-secret-key-that-should-be-in-env"
+    SECRET_KEY: str = "test-secret"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-
+    API_V1_STR: str = "/api/v1"
         # O nome do arquivo .env a ser procurado
     #env_file = ".env"
     #model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)

@@ -2,7 +2,7 @@
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from .base import CRUDBase
 from .. import models, schemas
@@ -13,7 +13,7 @@ class CRUDDiscount(CRUDBase[models.Discount, schemas.DiscountCreate, schemas.Dis
         Busca por um desconto ATIVO para um determinado produto.
         Um desconto é ativo se a data atual está entre start_time e end_time.
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         return (
             db.query(self.model)
             .filter(

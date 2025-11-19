@@ -1,11 +1,12 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from typing import List
 # Importar nossos modelos e schemas
-from . import models, schemas, database, crud
+from app.crud import *
+from . import models, schemas, database
 from .models import UserRole
 from .core.config import settings
 
@@ -24,9 +25,9 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     """Cria um novo token JWT."""
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -52,7 +53,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     except JWTError:
         raise credentials_exception
     
-    user = crud.get_user_by_email(db, email=token_data.email)
+    user = crud_user.user.get_by_email(db, email=token_data.email)
     
     if user is None:
         raise credentials_exception

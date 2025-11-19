@@ -3,6 +3,8 @@
 from fastapi.testclient import TestClient
 from faker import Faker
 from app.models import UserRole
+
+from app.core.config import settings
 fake = Faker()
 
 def test_create_user_success(client: TestClient):
@@ -18,7 +20,7 @@ def test_create_user_success(client: TestClient):
     }
 
     # --- Act ---
-    response = client.post("/users/register", json=user_data)
+    response = client.post(f"{settings.API_V1_STR}/users/register", json=user_data)
 
     # --- Assert ---
     assert response.status_code == 201
@@ -44,12 +46,12 @@ def test_create_user_email_already_exists(client: TestClient):
     }
     
     # Cria o primeiro usuário
-    response1 = client.post("/users/register", json=user_data)
+    response1 = client.post(f"{settings.API_V1_STR}/users/register", json=user_data)
     assert response1.status_code == 201
 
     # --- Act ---
     # Tenta criar o segundo usuário com o mesmo email
-    response2 = client.post("/users/register", json=user_data)
+    response2 = client.post(f"{settings.API_V1_STR}/users/register", json=user_data)
 
     # --- Assert ---
     assert response2.status_code == 400

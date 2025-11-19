@@ -3,12 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 
-from .. import models, schemas, auth
+from .. import models, schemas, auth,crud
 # Importamos o MÓDULO crud_order (para listagem) e o SERVIÇO
-from ..crud import crud_order
 from ..services.order_service import OrderService,OrderCreationError
 from ..database import get_db
-
+from ..core.config import settings
 router = APIRouter(
     prefix="/orders",
     tags=["Orders"]
@@ -27,7 +26,7 @@ def create_new_order(
     Cria uma nova encomenda para o utilizador atualmente autenticado.
     """
     try:
-        created_order = crud_order.create_order_in_db(db=db, user=current_user, order_create=order_create)
+        created_order = crud.order.create_order(db=db, user=current_user, order_create=order_create)
         return created_order
     except ValueError as e:
         # Capturamos o erro da camada CRUD e o transformamos num erro HTTP
@@ -48,7 +47,7 @@ def read_user_orders(
     Obtém o histórico de encomendas do utilizador atualmente autenticado.
     """
     # A lógica de negócio é simplesmente chamar a nossa função CRUD segura e otimizada
-    orders = crud_order.get_orders_by_user(
+    orders = crud.order.get_by_user(
         db=db, 
         user_id=current_user.id, # O ID vem do token, não da URL!
         skip=skip, 
@@ -90,7 +89,7 @@ def read_my_orders(
     """
     # A lógica é uma chamada direta à nossa função CRUD segura e otimizada.
     # O ID do utilizador é extraído de forma segura do token, não da requisição.
-    orders = crud_order.get_orders_by_customer(
+    orders = crud.order.get_orders_by_customer(
         db=db, 
         user_id=current_user.id, 
         skip=skip, 

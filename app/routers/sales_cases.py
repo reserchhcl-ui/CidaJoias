@@ -3,11 +3,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
-
-from .. import models, schemas, auth, crud
+from .. import models, schemas, auth,crud
 from ..database import get_db
 from ..models import SalesCaseStatus
 from ..services.sales_case_service import SalesCaseService, SalesCaseLogicError, SalesCaseAuthorizationError # <-- IMPORTAÇÕES CHAVE
+from ..core.config import settings
 
 router = APIRouter(
     prefix="/sales-cases",

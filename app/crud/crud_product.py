@@ -1,50 +1,54 @@
-# app/crud/crud_product.py
+# ARQUIVO ATUALIZADO: app/crud/crud_product.py
 
 from sqlalchemy.orm import Session
+from typing import List, Optional
+
+from .base import CRUDBase
 from .. import models, schemas
 
-# Cada função agora é super focada em uma única operação de DB.
-
-def get_product(db: Session, product_id: int) -> models.Product | None:
-    return db.query(models.Product).filter(models.Product.id == product_id).first()
-
-def get_product_by_barcode(db: Session, barcode: str) -> models.Product | None:
-    if not barcode:
-        return None
-    return db.query(models.Product).filter(models.Product.barcode == barcode).first()
-
-def get_products(db: Session, skip: int = 0, limit: int = 100) -> list[models.Product]:
-    return db.query(models.Product).offset(skip).limit(limit).all()
-
-def create_product(db: Session, product: schemas.ProductCreate) -> models.Product:
-    db_product = models.Product(**product.model_dump())
-    db.add(db_product)
-    db.commit()
-    db.refresh(db_product)
-    return db_product
-
-def update_product(db: Session, db_product: models.Product, product_update: schemas.ProductUpdate) -> models.Product:
-    update_data = product_update.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(db_product, key, value)
+class CRUDProduct(CRUDBase[models.Product, schemas.ProductCreate, schemas.ProductUpdate]):
     
-    db.add(db_product)
-    db.commit()
-    db.refresh(db_product)
-    return db_product
+    def get_by_barcode(self, db: Session, *, barcode: str) -> Optional[models.Product]:
+        if not barcode:
+            return None
+        return db.query(self.model).filter(self.model.barcode == barcode).first()
 
-def delete_product(db: Session, db_product: models.Product):
-    db.delete(db_product)
-    db.commit()
-    
-# --- Novas funções CRUD atômicas que serão usadas pelos serviços ---
+    def get_for_update(self, db: Session, product_id: int) -> Optional[models.Product]:
+        """
+        Busca um produto aplicando um lock pessimista (SELECT ... FOR UPDATE).
+        Vital para evitar 'race conditions' no checkout.
+        """
+        return (
+            db.query(self.model)
+            .filter(self.model.id == product_id)
+            .with_for_update()
+            .first()
+        )
 
-def get_product_for_update(db: Session, product_id: int) -> models.Product | None:
-    """Busca um produto aplicando um lock pessimista na linha para evitar race conditions."""
-    return db.query(models.Product).filter(models.Product.id == product_id).with_for_update().first()
+    def update_stock(
+        self, 
+        db: Session, 
+        *, 
+        db_product: models.Product, 
+        change_in_stock: int = 0, 
+        change_in_loan: int = 0
+    ) -> models.Product:
+        """
+        Atualiza atomicamente o estoque físico e a quantidade consignada.
+        NÃO faz commit para permitir transações maiores no Service.
+        """
+        db_product.stock_quantity += change_in_stock
+        db_product.on_loan_quantity += change_in_loan
+        db.add(db_product)
+        return db_product
 
-def decrease_stock(db: Session, *, product: models.Product, quantity: int) -> models.Product:
-    """Diminui o estoque físico de um produto. Não faz commit."""
-    product.stock_quantity -= quantity
-    db.add(product)
-    return product
+    def decrease_stock(self, db: Session, *, product: models.Product, quantity: int) -> models.Product:
+        """
+        Helper simples para baixar estoque em vendas diretas.
+        """
+        product.stock_quantity -= quantity
+        db.add(product)
+        return product
+
+# Instância exportada para ser usada nos Routers e Services
+product = CRUDProduct(models.Product)

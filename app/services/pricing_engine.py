@@ -2,7 +2,6 @@
 
 from sqlalchemy.orm import Session
 from decimal import Decimal
-
 from .. import models, crud
 
 class PricingEngine:

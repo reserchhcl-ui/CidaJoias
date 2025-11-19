@@ -1,58 +1,60 @@
-# ARQUIVO ATUALIZADO: tests/conftest.py
+# VERSÃO FINAL E CORRETA: tests/conftest.py
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker,Session
+from sqlalchemy.orm import sessionmaker, Session
 from typing import Generator
 
-# --- 1. Monkeypatch das Configurações ANTES de importar a app ---
-# Usamos a biblioteca de monkeypatch do pytest para substituir
-# as configurações ANTES que a aplicação as leia.
+# --- 1. Monkeypatch das Configurações ---
 @pytest.fixture(scope="session", autouse=True)
 def override_settings():
     from app.core.config import settings
-    # Substitui a URL do banco de dados em memória por uma URL de teste
     settings.DATABASE_URL = "sqlite:///./test.db"
-    # Você pode sobrescrever outras configs aqui se necessário para os testes
     settings.SECRET_KEY = "test-secret"
+    # Definir um prefixo para a API é uma boa prática
+    settings.API_V1_STR = "/api/v1" # Deixando vazio por enquanto para corresponder aos testes atuais
 
-# Agora que as settings foram sobrescritas, podemos importar o resto com segurança
+# --- Importações Pós-Configuração ---
 from app.main import app
 from app.database import Base, get_db
+from app.core.config import settings
 
 # --- 2. Configuração do Banco de Dados de Teste ---
-# O engine agora lê a URL já sobrescrita
-from app.core.config import settings
 engine = create_engine(
     settings.DATABASE_URL, connect_args={"check_same_thread": False}
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# --- 3. Fixtures do Pytest (quase inalteradas) ---
 
+# --- 3. Fixtures do Pytest ---
+
+# RENOMEAMOS A FIXTURE DE 'db_session' PARA 'db'
 @pytest.fixture(scope="function")
-def db_session() -> Generator:
-    """Fixture para criar uma sessão de banco de dados limpa para cada teste."""
-    # Garante que o motor use as tabelas do Base da nossa app
+def db() -> Generator[Session, None, None]:
+    """
+    Cria uma sessão de banco de dados limpa para cada teste.
+    Esta fixture agora se chama 'db', correspondendo ao que os testes pedem.
+    """
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     
-    db = TestingSessionLocal()
+    db_instance = TestingSessionLocal()
     try:
-        yield db
+        yield db_instance
     finally:
-        db.close()
+        db_instance.close()
 
+# A FIXTURE 'client' AGORA DEPENDE DA FIXTURE 'db'
 @pytest.fixture(scope="function")
-def client(db_session: Session) -> Generator:
-    """Fixture para criar um TestClient com a dependência do DB sobrescrita."""
+def client(db: Session) -> Generator[TestClient, None, None]:
+    """
+    Cria um TestClient que usa a sessão de banco de dados da fixture 'db'.
+    """
     
-    def override_get_db():
-        yield db_session
+    def override_get_db() -> Generator[Session, None, None]:
+        yield db
 
     app.dependency_overrides[get_db] = override_get_db
-
     yield TestClient(app)
-
     app.dependency_overrides.clear()

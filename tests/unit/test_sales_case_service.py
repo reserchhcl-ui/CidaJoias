@@ -43,7 +43,7 @@ def test_create_new_case_insufficient_stock(mocker):
     # Configurar os Mocks do CRUD para retornar nossos objetos falsos
     # `mocker.patch` intercepta a chamada à função real e a substitui
     mocker.patch("app.services.sales_case_service.crud.user.get", return_value=mock_sales_rep)
-    mocker.patch("app.services.sales_case_service.crud.crud_product.get_product", return_value=mock_product)
+    mocker.patch("app.services.sales_case_service.crud.product.get", return_value=mock_product)
 
     # Instanciar o nosso serviço com o mock do DB
     service = SalesCaseService(db=mock_db)
