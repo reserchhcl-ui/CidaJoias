@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from ..database import Base
 
 # Define tipos genéricos para o nosso Modelo SQLAlchemy e Schemas Pydantic
-ModelType = TypeVar("ModelType", bound=Base)
+ModelType = TypeVar("ModelType", bound=Base) # pyright: ignore[reportInvalidTypeForm]
 CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
 UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
 

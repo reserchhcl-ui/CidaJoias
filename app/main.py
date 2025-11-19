@@ -2,12 +2,8 @@
 
 from fastapi import FastAPI,APIRouter
 from .core.config import settings
-from . import models
-from .database import engine
-from .routers import products, users, orders, sales_cases,discounts# 1. Importar os nossos novos routers
+from .routers import products, users, orders, sales_cases,discounts,recommendations# 1. Importar os nossos novos routers
 
-# Cria as tabelas no banco de dados (se não existirem)
-#models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Cida Joias API",
@@ -20,7 +16,7 @@ api_router.include_router(products.router)
 api_router.include_router(orders.router)
 api_router.include_router(sales_cases.router)
 api_router.include_router(discounts.router)
-
+api_router.include_router(recommendations.router)
 app.include_router(api_router)
 @app.get("/")
 def read_root():

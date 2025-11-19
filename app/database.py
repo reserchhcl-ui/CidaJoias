@@ -1,27 +1,29 @@
-import os
+# ARQUIVO: app/database.py
 from sqlalchemy import create_engine
-#from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker,declarative_base 
-from dotenv import load_dotenv
+from sqlalchemy.orm import sessionmaker, declarative_base
 from app.core.config import settings
-# Carrega as variáveis de ambiente do arquivo .env
-load_dotenv()
 
-# Pega a URL do banco de dados do ambiente
-#DATABASE_URL = os.getenv("DATABASE_URL")
+# Configuração para PostgreSQL
+# pool_pre_ping=True ajuda a evitar erros de conexão perdida
+engine = create_engine(
+    settings.DATABASE_URL,
+    pool_pre_ping=True
+)
 
-# Cria o "motor" (engine) do SQLAlchemy
-#engine = create_engine(DATABASE_URL)
-engine = create_engine(settings.DATABASE_URL)
-# Cria uma "fábrica" de sessões (SessionLocal)
-# Esta sessão será usada em cada pedido (request) à API
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+Base = declarative_base()
+
 def get_db():
+    """
+    Dependência que fornece uma sessão de banco de dados.
+    Garante o fechamento da conexão ao final da requisição.
+    """
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-# Cria uma classe Base para nossos modelos (ORM)
-Base = declarative_base()
+
+
+
