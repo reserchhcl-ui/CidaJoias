@@ -16,8 +16,8 @@ class ProductBase(BaseModel):
 class Product(ProductBase):
     id: int
     barcode: str | None = None
-    current_price: Decimal 
-    cost_price: Decimal # Admins podem querer ver isso
+    current_price: float 
+    cost_price: float # Admins podem querer ver isso
 
     model_config = ConfigDict(from_attributes=True)
 

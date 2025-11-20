@@ -1,4 +1,4 @@
-# ARQUIVO: app/routers/products.py
+# ARQUIVO ATUALIZADO: app/routers/products.py
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -8,7 +8,6 @@ from ..services.pricing_engine import PricingEngine
 from .. import models, schemas, auth, crud
 from ..database import get_db
 
-# CORREÇÃO 1: Prefixo simples. O 'api/v1' vem do main.py
 router = APIRouter(
     prefix="/products",
     tags=["Products"]
@@ -19,7 +18,8 @@ def get_pricing_engine(db: Session = Depends(get_db)):
 
 # --- LEITURA (GET) - PÚBLICO ---
 
-@router.get("/", response_model=List[schemas.Product])
+# ADIÇÃO: operation_id="read_products" força o nome 'readProducts' no Frontend
+@router.get("/", response_model=List[schemas.Product], operation_id="read_products")
 def read_products(
     skip: int = 0, limit: int = 100, 
     db: Session = Depends(get_db),
@@ -33,8 +33,6 @@ def read_products(
     
     results = []
     for product in products_from_db:
-        # CORREÇÃO 2: Criamos um dict explicitamente para injetar o 'current_price'
-        # Isso satisfaz o Schema do Pydantic que exige esse campo.
         p_data = {
             "id": product.id,
             "name": product.name,
@@ -50,7 +48,7 @@ def read_products(
         results.append(p_data)
     return results
 
-@router.get("/{product_id}", response_model=schemas.Product)
+@router.get("/{product_id}", response_model=schemas.Product, operation_id="read_product")
 def read_product(
     product_id: int, 
     db: Session = Depends(get_db)
@@ -62,16 +60,14 @@ def read_product(
     pricing_engine = PricingEngine(db)
     current_price = pricing_engine.get_current_price_for_product(product=db_product)
     
-    # Conversão manual para garantir a injeção do campo extra
     p_data = db_product.__dict__.copy()
     p_data["current_price"] = current_price
     return p_data
 
-@router.get("/barcode/{barcode}", response_model=schemas.Product)
+@router.get("/barcode/{barcode}", response_model=schemas.Product, operation_id="read_product_by_barcode")
 def read_product_by_barcode(
     barcode: str,
     db: Session = Depends(get_db),
-    # Mantemos admin aqui se desejar, ou removemos para deixar público
     current_admin: models.User = Depends(auth.get_current_admin_user)
 ):
     db_product = crud.product.get_by_barcode(db, barcode=barcode)
@@ -85,7 +81,7 @@ def read_product_by_barcode(
 
 # --- ESCRITA (POST/PUT/DELETE) - ADMIN ONLY ---
 
-@router.post("/", response_model=schemas.Product, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=schemas.Product, status_code=status.HTTP_201_CREATED, operation_id="create_product")
 def create_product_endpoint(
     product: schemas.ProductCreate,
     db: Session = Depends(get_db),
@@ -96,13 +92,12 @@ def create_product_endpoint(
     
     new_product = crud.product.create(db=db, product=product)
     
-    # Ao criar, o preço atual é igual ao de venda
     p_data = new_product.__dict__.copy()
     p_data["current_price"] = new_product.selling_price
     p_data["id"] = new_product.id
     return p_data
 
-@router.put("/{product_id}", response_model=schemas.Product)
+@router.put("/{product_id}", response_model=schemas.Product, operation_id="update_product")
 def update_product_endpoint(
     product_id: int,
     product_update: schemas.ProductUpdate,
@@ -120,7 +115,7 @@ def update_product_endpoint(
     p_data["current_price"] = pricing_engine.get_current_price_for_product(product=updated_product)
     return p_data
 
-@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT, operation_id="delete_product")
 def delete_product_endpoint(
     product_id: int,
     db: Session = Depends(get_db),
