@@ -1,9 +1,9 @@
-from pydantic import BaseModel, Field,ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, validator
 from .models import UserRole
 from typing import List,Optional
 from datetime import datetime
 from decimal import Decimal
-
+from .models import CouponType
 # --- Schemas de Categoria ---
 class CategoryBase(BaseModel):
     name: str
@@ -104,7 +104,10 @@ class OrderResponse(BaseModel):
     id: int
     user_id: int
     status: str
-    items: List[OrderItemResponse] = []
+    subtotal: Decimal # Novo
+    applied_discount: Decimal # Novo
+    total_amount: Decimal # Novo
+    items: List[OrderItemResponse] = [] # (Certifique-se que OrderItemResponse existe)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -169,6 +172,7 @@ class CheckoutItem(BaseModel):
 
 class CheckoutRequest(BaseModel):
     items: List[CheckoutItem]
+    coupon_code: Optional[str] = None
 
 class DiscountBase(BaseModel):
     product_id: int
@@ -194,3 +198,34 @@ class ProductFilter(BaseModel):
     category_id: Optional[int] = None
     only_promotions: bool = False
     search_term: Optional[str] = None
+
+# --- SCHEMAS DE CUPOM ---
+
+class CouponBase(BaseModel):
+    code: str = Field(..., min_length=3, max_length=50)
+    discount_type: CouponType
+    discount_value: Decimal = Field(..., gt=0)
+    max_uses: Optional[int] = Field(None, gt=0)
+    expiration_date: datetime
+    min_purchase_amount: Decimal = Field(0.0, ge=0)
+    is_active: bool = True
+
+    @validator('code')
+    def uppercase_code(cls, v):
+        return v.upper().strip()
+
+class CouponCreate(CouponBase):
+    pass
+
+class CouponUpdate(BaseModel):
+    discount_type: Optional[CouponType] = None
+    discount_value: Optional[Decimal] = None
+    max_uses: Optional[int] = None
+    expiration_date: Optional[datetime] = None
+    min_purchase_amount: Optional[Decimal] = None
+    is_active: Optional[bool] = None
+
+class CouponResponse(CouponBase):
+    id: int
+    current_uses: int
+    model_config = ConfigDict(from_attributes=True)

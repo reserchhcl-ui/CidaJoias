@@ -86,8 +86,20 @@ class Order(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     status = Column(String(50), nullable=False, default="pending")
     
+    # NOVOS CAMPOS PARA HISTÓRICO FINANCEIRO
+    coupon_id = Column(Integer, ForeignKey("coupons.id"), nullable=True)
+    # Salva o valor monetário abatido (Ex: 15.00) para auditoria
+    applied_discount = Column(DECIMAL(10, 2), default=0.0) 
+    # Salva o subtotal (soma dos itens)
+    subtotal = Column(DECIMAL(10, 2), default=0.0)
+    # Salva o total final a pagar (subtotal - desconto)
+    total_amount = Column(DECIMAL(10, 2), default=0.0)
+
     owner = relationship("User", back_populates="orders")
     items = relationship("OrderItem", back_populates="order")
+    
+    # Nova relação
+    coupon = relationship("Coupon", back_populates="orders")
 
 class OrderItem(Base):
     __tablename__ = "order_items"
@@ -124,3 +136,27 @@ class SalesCaseItem(Base):
 
     case = relationship("SalesCase", back_populates="items")
     product = relationship("Product") # Relação simples
+
+# --- NOVO ENUM PARA TIPO DE CUPOM ---
+class CouponType(str, enum.Enum):
+    PERCENTAGE = "percentage" # Ex: 10%
+    FIXED = "fixed"           # Ex: R$ 10.00
+
+# --- NOVO MODELO: COUPON ---
+class Coupon(Base):
+    __tablename__ = "coupons"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(50), unique=True, index=True, nullable=False)
+    discount_type = Column(Enum(CouponType), nullable=False)
+    discount_value = Column(DECIMAL(10, 2), nullable=False)
+    
+    max_uses = Column(Integer, nullable=True) # Null = ilimitado
+    current_uses = Column(Integer, default=0, nullable=False)
+    
+    expiration_date = Column(DateTime(timezone=True), nullable=False)
+    min_purchase_amount = Column(DECIMAL(10, 2), default=0.0)
+    is_active = Column(Boolean, default=True)
+
+    # Relação com pedidos
+    orders = relationship("Order", back_populates="coupon")
