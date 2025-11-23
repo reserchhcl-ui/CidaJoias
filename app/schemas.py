@@ -8,7 +8,6 @@ from decimal import Decimal
 class CategoryBase(BaseModel):
     name: str
     slug: str
-
 class CategoryCreate(CategoryBase):
     pass
 
@@ -44,7 +43,7 @@ class ProductCreate(BaseModel):
 class ProductUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
-    selling_price: Decimal | None = None # Mudado de price para selling_price
+    selling_price: Decimal | None = None 
     cost_price: Decimal | None = None    # Adicionado
     stock_quantity: int | None = None
     barcode: str | None = None
