@@ -3,29 +3,40 @@ from .models import UserRole
 from typing import List,Optional
 from datetime import datetime
 from decimal import Decimal
-# Este será o "schema" que a API retornará ao listar produtos.
-# Note que ele NÃO é o modelo do SQLAlchemy, é um modelo Pydantic.
+
+# --- Schemas de Categoria ---
+class CategoryBase(BaseModel):
+    name: str
+    slug: str
+
+class CategoryCreate(CategoryBase):
+    pass
+
+class Category(CategoryBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
 class ProductBase(BaseModel):
     name: str
-    description: str | None = None # Permite que seja Nulo (Python 3.10+)
+    description: str | None = None 
     selling_price: Decimal
     stock_quantity: int
     image_url: str | None = None
+    category_id: int | None = None # Link opcional para criação
 
-# Schema para exibir o produto (incluindo o ID)
 class Product(ProductBase):
     id: int
     barcode: str | None = None
     current_price: float 
     cost_price: float # Admins podem querer ver isso
-
+    category: Optional[Category] = None
     model_config = ConfigDict(from_attributes=True)
 
 class ProductCreate(BaseModel):
     name: str
     description: str | None = None
     selling_price: Decimal = Field(..., gt=0)
-    cost_price: Decimal = Field(..., gt=0) # Preço de custo é obrigatório
+    cost_price: Decimal = Field(..., gt=0)
     stock_quantity: int = 0
     barcode: str | None = None
     image_url: str | None = None
@@ -33,19 +44,22 @@ class ProductCreate(BaseModel):
 class ProductUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
-    price: float | None = None
+    selling_price: Decimal | None = None # Mudado de price para selling_price
+    cost_price: Decimal | None = None    # Adicionado
     stock_quantity: int | None = None
     barcode: str | None = None
     image_url: str | None = None
+    category_id: int | None = None
+
 class UserBase(BaseModel):
     email: str
     
 # Schema para criar um usuário (pede uma senha)
 class UserCreate(UserBase):
     password: str = Field(
-        ...,  # O '...' significa que o campo ainda é obrigatório
-        min_length=8,  # Boa prática: exigir senha com pelo menos 8 caracteres
-        max_length=999  # Nosso escudo: recusa senhas > 72 caracteres
+        ..., 
+        min_length=8, 
+        max_length=999
     )
     role: UserRole = UserRole.CUSTOMER
 
@@ -174,3 +188,10 @@ class Discount(DiscountBase):
 class DiscountUpdate(BaseModel):
     discount_price: Optional[Decimal] = None
     end_time: Optional[datetime] = None
+
+class ProductFilter(BaseModel):
+    min_price: Optional[float] = None
+    max_price: Optional[float] = None
+    category_id: Optional[int] = None
+    only_promotions: bool = False
+    search_term: Optional[str] = None

@@ -32,34 +32,39 @@ class User(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     
-    # ## --- ALTERAÇÃO ---
-    # Substituímos 'is_admin' por um sistema de 'roles' mais flexível.
     role = Column(Enum(UserRole), nullable=False, default=UserRole.CUSTOMER)
-    
-    # Relações
+
     orders = relationship("Order", back_populates="owner")
-    # ## --- ADIÇÃO ---
-    # Nova relação para os estojos de uma vendedora
     sales_cases = relationship("SalesCase", back_populates="sales_rep")
+
+class Category(Base):
+    __tablename__ = "categories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), unique=True, index=True, nullable=False)
+    slug = Column(String(100), unique=True, index=True, nullable=False) # Para URLs amigáveis (SEO)
+    
+    products = relationship("Product", back_populates="category")
 
 class Product(Base):
     __tablename__ = "products"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
+    
     description = Column(String)
     selling_price = Column(DECIMAL(10, 2), nullable=False) # Preço de venda padrão
     cost_price = Column(DECIMAL(10, 2), nullable=False)    # Preço de custo (regra de negócio)
     
-    # ## --- ALTERAÇÃO ---
-    # Agora temos um controlo de inventário mais detalhado.
     stock_quantity = Column(Integer, nullable=False, default=0) # Stock físico total
     on_loan_quantity = Column(Integer, nullable=False, default=0) # Stock em estojos
     
     barcode = Column(String(100), unique=True, index=True)
     image_url = Column(String(1024))
     
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     # Relações
+    category = relationship("Category", back_populates="products")
     order_items = relationship("OrderItem", back_populates="product")
     discounts = relationship("Discount", back_populates="product", cascade="all, delete-orphan")
 

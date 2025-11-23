@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI,APIRouter
 from .core.config import settings
-from .routers import products, users, orders, sales_cases,discounts,recommendations# 1. Importar os nossos novos routers
+from .routers import products, users, orders, sales_cases,discounts,recommendations,categories
 
 
 app = FastAPI(
@@ -13,6 +13,7 @@ api_router = APIRouter(prefix=settings.API_V1_STR)
 # 2. Incluir os routers na nossa aplicação principal
 api_router.include_router(users.router)
 api_router.include_router(products.router)
+api_router.include_router(categories.router)
 api_router.include_router(orders.router)
 api_router.include_router(sales_cases.router)
 api_router.include_router(discounts.router)

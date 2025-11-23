@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List,Any
 
 from .. import models, schemas, auth
 from ..database import get_db
@@ -63,6 +63,39 @@ def get_similar_products(
     for product in products:
         p_data = product.__dict__.copy()
         p_data["current_price"] = pricing_engine.get_current_price_for_product(product=product)
+        results.append(p_data)
+        
+    return results
+
+@router.get("/trending", response_model=List[schemas.Product])
+def get_trending_recommendations(
+    limit: int = 4,
+    db: Session = Depends(get_db),
+    rec_engine: RecommendationEngine = Depends(get_recommendation_engine),
+    pricing_engine: PricingEngine = Depends(get_pricing_engine)
+) -> Any:
+    """
+    Retorna produtos 'Trending' enriquecidos com o preço atual (descontos aplicados).
+    """
+    # 1. ML: Seleciona OS PRODUTOS
+    recommended_products = rec_engine.get_trending_products(limit=limit)
+    
+    if not recommended_products:
+        return []
+
+    # 2. Pricing: Calcula OS PREÇOS
+    # Busca preços em lote para performance
+    current_prices = pricing_engine.get_current_prices_for_products(products=recommended_products)
+    
+    # 3. Montagem: Cria a resposta combinando Dados do Produto + Preço Calculado
+    results = []
+    for product in recommended_products:
+        # Convertemos o modelo SQLAlchemy para dict para poder injetar o campo extra
+        p_data = product.__dict__.copy()
+        
+        # Injetamos 'current_price' que o schema Pydantic exige
+        p_data["current_price"] = current_prices.get(product.id, product.selling_price)
+        
         results.append(p_data)
         
     return results
