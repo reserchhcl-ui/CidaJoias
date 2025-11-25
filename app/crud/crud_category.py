@@ -3,11 +3,12 @@
 from typing import Optional
 from sqlalchemy.orm import Session
 from .base import CRUDBase
-from ..models import Category
-from ..schemas import CategoryCreate, Category
+from .. import models, schemas # Importamos os módulos inteiros
 
-class CRUDCategory(CRUDBase[Category, CategoryCreate, Category]): # Usando Category schema para update por simplicidade
-    def get_by_slug(self, db: Session, *, slug: str) -> Optional[Category]:
+# CRUDBase[ModelType, CreateSchema, UpdateSchema]
+class CRUDCategory(CRUDBase[models.Category, schemas.CategoryCreate, schemas.Category]):
+    def get_by_slug(self, db: Session, *, slug: str) -> Optional[models.Category]:
         return db.query(self.model).filter(self.model.slug == slug).first()
 
-category = CRUDCategory(Category)
+# Agora passamos corretamente o MODELO SQLAlchemy
+category = CRUDCategory(models.Category)

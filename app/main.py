@@ -10,6 +10,7 @@ app = FastAPI(
     description="Back-end."
 )
 api_router = APIRouter(prefix=settings.API_V1_STR)
+
 # 2. Incluir os routers na nossa aplicação principal
 api_router.include_router(users.router)
 api_router.include_router(products.router)
@@ -19,6 +20,7 @@ api_router.include_router(sales_cases.router)
 api_router.include_router(discounts.router)
 api_router.include_router(coupons.router)
 api_router.include_router(recommendations.router)
+
 app.include_router(api_router)
 @app.get("/")
 def read_root():

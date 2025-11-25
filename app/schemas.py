@@ -210,7 +210,6 @@ class CouponBase(BaseModel):
     min_purchase_amount: Decimal = Field(0.0, ge=0)
     is_active: bool = True
 
-    @validator('code')
     def uppercase_code(cls, v):
         return v.upper().strip()
 

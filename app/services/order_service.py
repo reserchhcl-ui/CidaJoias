@@ -29,7 +29,11 @@ class OrderService:
             
         # Validade de Data
         now = datetime.now(timezone.utc)
-        if coupon.expiration_date < now:
+        expiration = coupon.expiration_date
+        if expiration.tzinfo is None:
+            expiration = expiration.replace(tzinfo=timezone.utc)
+            
+        if expiration < now:
             raise OrderCreationError("Este cupom expirou.")
             
         # Limite de uso

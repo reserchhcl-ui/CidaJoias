@@ -8,7 +8,7 @@ from decimal import Decimal
 from .. import models, schemas, auth, crud
 from ..database import get_db
 from ..services.order_service import OrderService # Importamos apenas para lógica auxiliar se necessário
-
+from datetime import datetime, timezone
 router = APIRouter(
     prefix="/coupons",
     tags=["Coupons"]
@@ -74,8 +74,12 @@ def validate_coupon(
     if not coupon.is_active:
         raise HTTPException(status_code=400, detail="Cupom inativo.")
         
-    from datetime import datetime, timezone
-    if coupon.expiration_date < datetime.now(timezone.utc):
+    now = datetime.now(timezone.utc)
+    expiration = coupon.expiration_date
+    if expiration.tzinfo is None:
+        expiration = expiration.replace(tzinfo=timezone.utc)
+        
+    if expiration < now:
         raise HTTPException(status_code=400, detail="Cupom expirado.")
         
     if coupon.max_uses is not None and coupon.current_uses >= coupon.max_uses:

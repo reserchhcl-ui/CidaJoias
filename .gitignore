@@ -4,7 +4,6 @@ venv/
 /node_modules
 /.pnp
 .pnp.js
-web-store/public/Produtos_Images
 # testing
 /coverage
 
