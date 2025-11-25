@@ -1,10 +1,8 @@
-# ARQUIVO ATUALIZADO: app/routers/products.py
-
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status,File, UploadFile
 from sqlalchemy.orm import Session
 from typing import List
-
 from ..services.pricing_engine import PricingEngine
+from ..services.storage_service import storage
 from .. import models, schemas, auth, crud
 from ..database import get_db
 
@@ -150,3 +148,42 @@ def delete_product_endpoint(
 ):
     crud.product.remove(db=db, id=product_id)
     return None
+
+@router.post("/{product_id}/image", response_model=schemas.Product)
+def upload_product_image(
+    product_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(auth.get_current_admin_user) # Apenas Admin
+):
+    """
+    Faz upload de uma imagem para um produto.
+    Se o produto já tiver imagem, ela será substituída e a antiga apagada do disco.
+    """
+    # 1. Buscar Produto
+    product = crud.product.get(db, id=product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    try:
+        # 2. Salvar nova imagem
+        image_url = storage.save_image(file, sub_folder="products")
+        
+        # 3. (Opcional) Limpar imagem antiga para não acumular lixo
+        if product.image_url:
+            storage.delete_image(product.image_url)
+
+        # 4. Atualizar referência no banco
+        crud.product.update(db, db_obj=product, obj_in={"image_url": image_url})
+        
+        # 5. Recarregar para retornar com o campo atualizado
+        db.refresh(product)
+        
+        # Injetar preço atual (Pricing Engine) para manter o contrato do Schema
+        pricing_engine = PricingEngine(db)
+        p_data = product.__dict__.copy()
+        p_data["current_price"] = pricing_engine.get_current_price_for_product(product=product)
+        return p_data
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict
 from .models import UserRole
 from typing import List,Optional
 from datetime import datetime

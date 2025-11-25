@@ -2,7 +2,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import model_validator
 from typing import Optional
-
+import os
 class Settings(BaseSettings):
     """
     Configurações da aplicação.
@@ -26,7 +26,9 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = "84141039"
     POSTGRES_DB: str = "CidaJoias-db"
     POSTGRES_PORT: int = 5432
-
+    # --- Configurações de Mídia ---
+    UPLOAD_DIR: str = "uploads" # Diretório local para salvar imagens
+    BASE_URL: str = "http://localhost:8000" # Usado para gerar a URL completa da imagem
     # Definimos DATABASE_URL como Optional[str] para que possa ser sobrescrito.
     # Se for None, será calculado pelo validator.
     DATABASE_URL: Optional[str] = None
@@ -45,3 +47,4 @@ class Settings(BaseSettings):
         return self
 
 settings = Settings()
+os.makedirs(settings.UPLOAD_DIR, exist_ok=True)

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from typing import List
 # Importar nossos modelos e schemas
-from app.crud import *
+from app.crud import user as crud_user_instance
 from . import models, schemas, database
 from .models import UserRole
 from .core.config import settings
@@ -50,7 +50,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     except JWTError:
         raise credentials_exception
     
-    user = crud_user.user.get_by_email(db, email=token_data.email)
+    user = crud_user_instance.get_by_email(db, email=token_data.email)
     
     if user is None:
         raise credentials_exception
@@ -60,11 +60,11 @@ async def get_current_admin_user(current_user: schemas.User = Depends(get_curren
     """
     Dependência que REQUER que o usuário atual seja um admin.
     """
-    if not current_user.is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="The user does not have administrative privileges"
-        )
+    if current_user.role != UserRole.ADMIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail="The user does not have administrative privileges"
+            )
     return current_user
 
 def require_role(required_roles: List[UserRole]):
