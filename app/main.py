@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI,APIRouter
 from .core.config import settings
-from .routers import products, users, orders, sales_cases, discounts, recommendations, categories, coupons
+from .routers import products, users, orders, sales_cases, discounts, recommendations, categories, coupons, addresses ,shipping
 from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(
@@ -20,6 +20,9 @@ api_router.include_router(sales_cases.router)
 api_router.include_router(discounts.router)
 api_router.include_router(coupons.router)
 api_router.include_router(recommendations.router)
+api_router.include_router(addresses.router)
+api_router.include_router(shipping.router)
+
 
 app.include_router(api_router)
 @app.get("/")

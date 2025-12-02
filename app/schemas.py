@@ -1,9 +1,9 @@
-from pydantic import BaseModel, Field, ConfigDict
-from .models import UserRole
+from pydantic import BaseModel, Field, ConfigDict,field_validator
 from typing import List,Optional
 from datetime import datetime
 from decimal import Decimal
-from .models import CouponType
+from .models import UserRole, CouponType
+
 # --- Schemas de Categoria ---
 class CategoryBase(BaseModel):
     name: str
@@ -228,3 +228,50 @@ class CouponResponse(CouponBase):
     id: int
     current_uses: int
     model_config = ConfigDict(from_attributes=True)
+
+class AddressBase(BaseModel):
+    name: str = Field(..., description="Apelido do endereço (ex: Casa)")
+    recipient_name: str
+    zip_code: str = Field(..., min_length=8, max_length=8)
+    street: str
+    number: str
+    complement: Optional[str] = None
+    neighborhood: str
+    city: str
+    state: str = Field(..., min_length=2, max_length=2)
+    is_default: bool = False
+
+class AddressCreate(AddressBase):
+    pass
+
+class AddressUpdate(BaseModel):
+    name: Optional[str] = None
+    recipient_name: Optional[str] = None
+    zip_code: Optional[str] = None
+    street: Optional[str] = None
+    number: Optional[str] = None
+    complement: Optional[str] = None
+    neighborhood: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    is_default: Optional[bool] = None
+
+class Address(AddressBase):
+    id: int
+    user_id: int
+    model_config = ConfigDict(from_attributes=True)
+
+# --- SCHEMAS DE FRETE ---
+
+class CheckoutItem(BaseModel):
+    product_id: int
+    quantity: int = Field(..., gt=0)
+
+class ShippingOption(BaseModel):
+    name: str # PAC, SEDEX, Motoboy
+    price: float
+    estimated_days: int
+
+class ShippingSimulationRequest(BaseModel):
+    zip_code: str = Field(..., min_length=8, max_length=8)
+    items: List[CheckoutItem]

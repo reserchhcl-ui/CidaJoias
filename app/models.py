@@ -36,15 +36,8 @@ class User(Base):
 
     orders = relationship("Order", back_populates="owner")
     sales_cases = relationship("SalesCase", back_populates="sales_rep")
+    addresses = relationship("Address", back_populates="user", cascade="all, delete-orphan")
 
-class Category(Base):
-    __tablename__ = "categories"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), unique=True, index=True, nullable=False)
-    slug = Column(String(100), unique=True, index=True, nullable=False) # Para URLs amigáveis (SEO)
-    
-    products = relationship("Product", back_populates="category")
 
 class Product(Base):
     __tablename__ = "products"
@@ -97,9 +90,34 @@ class Order(Base):
 
     owner = relationship("User", back_populates="orders")
     items = relationship("OrderItem", back_populates="order")
-    
-    # Nova relação
     coupon = relationship("Coupon", back_populates="orders")
+
+class Address(Base):
+    __tablename__ = "addresses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    
+    name = Column(String(50), nullable=False) # Ex: "Casa", "Escritório"
+    recipient_name = Column(String(100), nullable=False)
+    zip_code = Column(String(8), nullable=False)
+    street = Column(String(255), nullable=False)
+    number = Column(String(20), nullable=False)
+    complement = Column(String(100), nullable=True)
+    neighborhood = Column(String(100), nullable=False)
+    city = Column(String(100), nullable=False)
+    state = Column(String(2), nullable=False)
+    
+    is_default = Column(Boolean, default=False)
+
+    user = relationship("User", back_populates="addresses")
+
+class Category(Base):
+    __tablename__ = "categories"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), unique=True, index=True, nullable=False)
+    slug = Column(String(100), unique=True, index=True, nullable=False)
+    products = relationship("Product", back_populates="category")
 
 class OrderItem(Base):
     __tablename__ = "order_items"

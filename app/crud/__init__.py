@@ -7,3 +7,4 @@ from .crud_sales_case import sales_case
 from .crud_discount import discount
 from .crud_category import category 
 from .crud_coupon import coupon
+from .crud_address import address
