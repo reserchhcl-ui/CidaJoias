@@ -1,5 +1,5 @@
 # app/routers/orders.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status,BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -7,7 +7,9 @@ from .. import models, schemas, auth,crud
 # Importamos o MÓDULO crud_order (para listagem) e o SERVIÇO
 from ..services.order_service import OrderService,OrderCreationError
 from ..database import get_db
-from ..core.config import settings
+from ..services.email_service import email_service
+
+
 router = APIRouter(
     prefix="/orders",
     tags=["Orders"]
@@ -58,19 +60,27 @@ def read_user_orders(
 @router.post("/pedidos", response_model=schemas.OrderResponse, status_code=status.HTTP_201_CREATED, tags=["Public Checkout"])
 def public_checkout(
     checkout_request: schemas.CheckoutRequest,
+    background_tasks: BackgroundTasks, # <--- Injeção do FastAPI
     current_user: models.User = Depends(auth.require_customer_user),
-    # Injetamos o SERVIÇO, não mais o 'db' diretamente
     order_service: OrderService = Depends(get_order_service)
 ):
     try:
-        # A única responsabilidade do endpoint é chamar o serviço
         new_order = order_service.create_customer_order(
             user=current_user, 
             checkout_request=checkout_request
         )
+        
+        # Agendar envio de e-mail (executa APÓS retornar a resposta 201)
+        background_tasks.add_task(
+            email_service.send_order_confirmation, 
+            user=current_user, 
+            order=new_order
+        )
+        
         return new_order
     except ValueError as e:
-        # O endpoint ainda traduz exceções de negócio para erros HTTP
+        # Tratamento de erro específico do serviço
+        # Nota: OrderCreationError herda de ValueError no nosso código
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)

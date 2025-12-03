@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     # Permite ler do arquivo .env e ignora variáveis extras não mapeadas
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
+    EMAILS_ENABLED: bool = True
+    EMAIL_FROM: str = "noreply@cidajoias.com"
     # --- Identidade da API ---
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "Cida Joias E-commerce"
