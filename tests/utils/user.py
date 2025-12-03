@@ -1,4 +1,4 @@
-# ARQUIVO REFATORADO: tests/utils/user.py
+# tests/utils/user.py
 
 from typing import Dict
 from fastapi.testclient import TestClient
@@ -11,19 +11,26 @@ from app.models import User, UserRole
 
 fake = Faker()
 
-def create_random_user(db: Session, *, is_admin: bool = False) -> User:
+def create_random_user(
+    db: Session, 
+    *, 
+    is_admin: bool = False, 
+    password: str = None # <--- NOVO PARÂMETRO
+) -> User:
     """
     Cria um usuário com dados aleatórios no banco de dados de teste.
+    Se 'password' for fornecido, usa-o; caso contrário, gera um aleatório.
     """
     email = fake.email()
-    password = fake.password(length=12)
     
-    # MELHORIA: Uso do Enum UserRole para garantir consistência com o Model
+    # Lógica corrigida para usar a senha fornecida ou gerar uma nova
+    if password is None:
+        password = fake.password(length=12)
+    
     role = UserRole.ADMIN if is_admin else UserRole.CUSTOMER
     
     user_in = schemas.UserCreate(email=email, password=password, role=role)
     
-    # Usamos a instância 'user' exportada em app/crud/__init__.py
     return crud.user.create(db=db, obj_in=user_in)
 
 def user_authentication_headers(
@@ -34,8 +41,6 @@ def user_authentication_headers(
     """
     data = {"username": email, "password": password}
 
-    # O endpoint de token geralmente reside na raiz ou em /api/v1/token dependendo do router.
-    # Assumindo que ele foi incluído no main.py via api_router:
     response = client.post(f"{settings.API_V1_STR}/token", data=data)
     
     if response.status_code != 200:

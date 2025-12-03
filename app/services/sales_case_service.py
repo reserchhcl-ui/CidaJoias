@@ -1,12 +1,12 @@
-# NOVO ARQUIVO: app/services/sales_case_service.py
+# app/services/sales_case_service.py
 
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from typing import List
-from .. import models, schemas ,crud
+from .. import models, schemas, crud
 from ..models import UserRole, SalesCaseStatus
 
-# Exceções customizadas para um tratamento de erro mais claro no router
+# Exceções customizadas
 class SalesCaseLogicError(ValueError): pass
 class SalesCaseAuthorizationError(PermissionError): pass
 
@@ -16,13 +16,18 @@ class SalesCaseService:
 
     def create_new_case(self, *, case_create: schemas.SalesCaseCreate) -> models.SalesCase:
         # --- FASE 1: VALIDAÇÕES DE NEGÓCIO ---
-        sales_rep = crud.user.get(self.db, user_id=case_create.sales_rep_id)
+        
+        # CORREÇÃO 1: Usar 'id' em vez de 'user_id' para CRUDBase
+        sales_rep = crud.user.get(self.db, id=case_create.sales_rep_id)
+        
         if not sales_rep or sales_rep.role != UserRole.SALES_REP:
             raise SalesCaseLogicError(f"Sales representative with id {case_create.sales_rep_id} not found or is not a sales_rep.")
 
         products_to_loan = []
         for item in case_create.items:
-            product = crud.product.get(self.db, product_id=item.product_id)
+            # CORREÇÃO 2: Usar 'id' em vez de 'product_id' para CRUDBase
+            product = crud.product.get(self.db, id=item.product_id)
+            
             if not product:
                 raise SalesCaseLogicError(f"Product with id {item.product_id} not found.")
             
@@ -34,19 +39,23 @@ class SalesCaseService:
         # --- FASE 2: EXECUÇÃO TRANSACIONAL ---
         try:
             return_by_date = datetime.now(timezone.utc) + timedelta(days=case_create.loan_duration_days)
+            # Aqui usamos 'sales_rep_id' pois é o método customizado create_case do CRUDSalesCase
             db_case = crud.sales_case.create_case(self.db, sales_rep_id=case_create.sales_rep_id, return_by_date=return_by_date)
 
             for item_data in products_to_loan:
                 product = item_data["product"]
                 quantity = item_data["quantity"]
-                crud.sales_case.create_case(self.db, case_id=db_case.id, product_id=product.id, quantity=quantity)
-                crud.product.update(self.db, db_product=product, change_in_stock=0, change_in_loan=+quantity)
+                # create_item do CRUDSalesCase espera case_id e product_id
+                crud.sales_case.create_item(self.db, case_id=db_case.id, product_id=product.id, quantity=quantity)
+                crud.product.update_stock(self.db, db_product=product, change_in_stock=0, change_in_loan=+quantity)
             
             self.db.commit()
             self.db.refresh(db_case)
             return db_case
         except Exception as e:
             self.db.rollback()
+            if isinstance(e, SalesCaseLogicError):
+                raise e
             raise SalesCaseLogicError(f"An unexpected error occurred during case creation: {e}")
 
     def process_case_return(self, *, case_id: int, return_request: schemas.SalesCaseReturnRequest, current_user: models.User) -> schemas.SalesCaseReturnReport:
@@ -74,13 +83,19 @@ class SalesCaseService:
             
             for product_id, quantity_loaned in loaned_items_map.items():
                 quantity_sold = items_sold_map.get(product_id, 0)
-                product = crud.product.get(self.db, product_id=product_id)
-                crud.product.update(self.db, db_product=product, change_in_stock=-quantity_sold, change_in_loan=-quantity_loaned)
                 
-                subtotal = quantity_sold * float(product.price)
+                # CORREÇÃO 3: Usar 'id' para CRUDBase
+                product = crud.product.get(self.db, id=product_id)
+                if not product:
+                     raise SalesCaseLogicError(f"Product with ID {product_id} from case seems to be missing.")
+
+                crud.product.update_stock(self.db, db_product=product, change_in_stock=-quantity_sold, change_in_loan=-quantity_loaned)
+                
+                # CORREÇÃO 4: Usar 'selling_price' em vez de 'price'
+                subtotal = quantity_sold * float(product.selling_price)
                 items_summary_report.append(schemas.ItemReturnSummary(
                     product_name=product.name, quantity_loaned=quantity_loaned, quantity_sold=quantity_sold,
-                    quantity_returned=quantity_loaned - quantity_sold, price_per_item=float(product.price), subtotal_sold=subtotal
+                    quantity_returned=quantity_loaned - quantity_sold, price_per_item=float(product.selling_price), subtotal_sold=subtotal
                 ))
                 total_items_sold += quantity_sold
                 total_value_sold += subtotal
@@ -90,9 +105,10 @@ class SalesCaseService:
                 new_order = crud.order.create_order(self.db, user_id=db_case.sales_rep_id, status="completed_by_sales_rep")
                 for item_sold in return_request.items_sold:
                     if item_sold.quantity_sold > 0:
-                        product = crud.product.get(self.db, product_id=item_sold.product_id)
+                        # CORREÇÃO 5: Usar 'id' e 'selling_price'
+                        product = crud.product.get(self.db, id=item_sold.product_id)
                         crud.order.create_order_item(self.db, order_id=new_order.id, product_id=item_sold.product_id, 
-                                                     quantity=item_sold.quantity_sold, price_at_purchase=product.price)
+                                                     quantity=item_sold.quantity_sold, price_at_purchase=product.selling_price)
                 new_order_id = new_order.id
 
             crud.sales_case.update_status(self.db, db_case=db_case, status=SalesCaseStatus.RETURNED)
@@ -104,4 +120,6 @@ class SalesCaseService:
             )
         except Exception as e:
             self.db.rollback()
+            if isinstance(e, (SalesCaseLogicError, SalesCaseAuthorizationError)):
+                raise e
             raise SalesCaseLogicError(f"An unexpected error occurred during case return processing: {e}")
