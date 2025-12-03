@@ -8,6 +8,7 @@ from .models import UserRole, CouponType
 class CategoryBase(BaseModel):
     name: str
     slug: str
+    
 class CategoryCreate(CategoryBase):
     pass
 
@@ -275,3 +276,21 @@ class ShippingOption(BaseModel):
 class ShippingSimulationRequest(BaseModel):
     zip_code: str = Field(..., min_length=8, max_length=8)
     items: List[CheckoutItem]
+
+class CreditCard(BaseModel):
+    holder_name: str
+    number: str = Field(..., min_length=13, max_length=19)
+    exp_month: str = Field(..., min_length=2, max_length=2)
+    exp_year: str = Field(..., min_length=2, max_length=4)
+    cvv: str = Field(..., min_length=3, max_length=4)
+
+class PaymentRequest(BaseModel):
+    order_id: int
+    payment_method: str = "credit_card" # Por enquanto só simulamos cartão
+    card_info: Optional[CreditCard] = None
+
+class PaymentResponse(BaseModel):
+    order_id: int
+    status: str # approved, failed
+    transaction_id: str
+    message: str

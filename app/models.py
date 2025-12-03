@@ -23,6 +23,16 @@ class SalesCaseStatus(str, enum.Enum):
     RETURNED = "returned"
     OVERDUE = "overdue"
 
+# --- NOVO ENUM PARA TIPO DE CUPOM ---
+class CouponType(str, enum.Enum):
+    PERCENTAGE = "percentage" # Ex: 10%
+    FIXED = "fixed"           # Ex: R$ 10.00
+
+class PaymentStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    FAILED = "failed"
+    REFUNDED = "refunded"
 # --- MODELOS ATUALIZADOS E NOVOS ---
 
 class User(Base):
@@ -78,15 +88,17 @@ class Order(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     status = Column(String(50), nullable=False, default="pending")
-    
+
+    # --- NOVOS CAMPOS FINANCEIROS ---
+    payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING, nullable=False)
+    payment_method = Column(String(50), nullable=True) # credit_card, pix
+    transaction_id = Column(String(100), nullable=True) # ID externo do gateway
+
     # NOVOS CAMPOS PARA HISTÓRICO FINANCEIRO
     coupon_id = Column(Integer, ForeignKey("coupons.id"), nullable=True)
-    # Salva o valor monetário abatido (Ex: 15.00) para auditoria
-    applied_discount = Column(DECIMAL(10, 2), default=0.0) 
-    # Salva o subtotal (soma dos itens)
-    subtotal = Column(DECIMAL(10, 2), default=0.0)
-    # Salva o total final a pagar (subtotal - desconto)
-    total_amount = Column(DECIMAL(10, 2), default=0.0)
+    applied_discount = Column(DECIMAL(10, 2), default=0.0) # Salva o valor monetário abatido (Ex: 15.00) para auditoria
+    subtotal = Column(DECIMAL(10, 2), default=0.0) # Salva o subtotal (soma dos itens)
+    total_amount = Column(DECIMAL(10, 2), default=0.0) # Salva o total final a pagar (subtotal - desconto)
 
     owner = relationship("User", back_populates="orders")
     items = relationship("OrderItem", back_populates="order")
@@ -155,10 +167,6 @@ class SalesCaseItem(Base):
     case = relationship("SalesCase", back_populates="items")
     product = relationship("Product") # Relação simples
 
-# --- NOVO ENUM PARA TIPO DE CUPOM ---
-class CouponType(str, enum.Enum):
-    PERCENTAGE = "percentage" # Ex: 10%
-    FIXED = "fixed"           # Ex: R$ 10.00
 
 # --- NOVO MODELO: COUPON ---
 class Coupon(Base):

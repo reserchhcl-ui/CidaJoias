@@ -2,13 +2,14 @@
 
 from fastapi import FastAPI,APIRouter
 from .core.config import settings
-from .routers import products, users, orders, sales_cases, discounts, recommendations, categories, coupons, addresses ,shipping
+from .routers import products, users, orders, sales_cases, discounts, recommendations, categories, coupons, addresses ,shipping, payments
 from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(
     title="Cida Joias API",
     description="Back-end."
 )
+
 api_router = APIRouter(prefix=settings.API_V1_STR)
 app.mount("/static", StaticFiles(directory=settings.UPLOAD_DIR), name="static")
 # 2. Incluir os routers na nossa aplicação principal
@@ -22,7 +23,7 @@ api_router.include_router(coupons.router)
 api_router.include_router(recommendations.router)
 api_router.include_router(addresses.router)
 api_router.include_router(shipping.router)
-
+api_router.include_router(payments.router)
 
 app.include_router(api_router)
 @app.get("/")
