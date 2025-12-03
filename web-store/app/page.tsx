@@ -3,7 +3,7 @@ import Header from "@/components/Header";
 import Hero from "@/components/Hero";
 import ProductCard from "@/components/ProductCard";
 import CidaIntelligence from "@/components/CidaIntelligence";
-import { Product } from "@/types";
+import { Product } from "@/src/lib/types";
 import CartSidebar from "@/components/CartSidebar";
 // Função para buscar dados da sua API Python
 async function getProducts(): Promise<Product[]> {

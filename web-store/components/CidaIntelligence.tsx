@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Sparkles, Loader2 } from "lucide-react";
 import ProductCard from "@/components/ProductCard"; // Reutilizamos o Card!
-import { Product } from "@/types";
+import { Product } from "@/src/lib/types";
 
 export default function CidaIntelligence() {
   const [products, setProducts] = useState<Product[]>([]);

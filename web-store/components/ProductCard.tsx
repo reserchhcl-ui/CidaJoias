@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { Product } from "@/types";
+import { Product } from "@/src/lib/types";
 import { ShoppingCart, ImageOff } from "lucide-react"; // Adicionei ImageOff para erro visual
-import { useCartStore } from "@/store/cart";
+import { useCartStore } from "@/src/lib/store/cart";
 import { useState } from "react";
 
 interface ProductCardProps {
