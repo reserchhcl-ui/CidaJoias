@@ -85,24 +85,3 @@ def public_checkout(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-
-@router.get("/meus-pedidos", response_model=List[schemas.OrderResponse], tags=["Public Checkout"])
-def read_my_orders(
-    skip: int = 0,
-    limit: int = 25, # Um limite padrão mais conservador para listas
-    db: Session = Depends(get_db),
-    # Acesso restrito a clientes, obtendo o utilizador autenticado do token
-    current_user: models.User = Depends(auth.require_customer_user)
-):
-    """
-    Obtém o histórico de pedidos para o cliente atualmente autenticado.
-    """
-    # A lógica é uma chamada direta à nossa função CRUD segura e otimizada.
-    # O ID do utilizador é extraído de forma segura do token, não da requisição.
-    orders = crud.order.get_orders_by_customer(
-        db=db, 
-        user_id=current_user.id, 
-        skip=skip, 
-        limit=limit
-    )
-    return orders

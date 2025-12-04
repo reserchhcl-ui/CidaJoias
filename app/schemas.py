@@ -56,21 +56,20 @@ class UserBase(BaseModel):
     
 # Schema para criar um usuário (pede uma senha)
 class UserCreate(UserBase):
-    password: str = Field(
-        ..., 
-        min_length=8, 
-        max_length=999
-    )
+    password: str = Field(..., min_length=8, max_length=999)
     role: UserRole = UserRole.CUSTOMER
 
 # Schema para ler/retornar um usuário (NUNCA retorne a senha)
 class User(UserBase):
     id: int
     role: UserRole
-
-
+    # is_active: bool = True # Poderíamos adicionar no futuro
     model_config = ConfigDict(from_attributes=True)
 
+class UserUpdate(BaseModel):
+    email: Optional[str] = None
+    password: Optional[str] = Field(None, min_length=8)
+    role: UserRole = UserRole.CUSTOMER # Apenas admin deveria conseguir alterar isso via API
 # --- Schemas de Autenticação ---
 
 class Token(BaseModel):
