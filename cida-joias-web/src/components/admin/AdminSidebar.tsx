@@ -64,14 +64,14 @@ export function AdminSidebar() {
             Ver Loja
           </Button>
         </Link>
-        <Button 
-          variant="ghost" 
-          className="w-full justify-start gap-3 text-red-400 hover:text-red-300 hover:bg-red-900/20"
-          onClick={logout}
-        >
-          <LogOut className="h-5 w-5" />
-          Sair
-        </Button>
+        <Link href="/">
+          <Button variant="ghost" className="w-full justify-start gap-3 text-red-400 hover:text-red-300 hover:bg-red-900/20"
+            onClick={logout}
+          >
+            <LogOut className="h-5 w-5" />
+            Sair
+          </Button>
+        </Link>
       </div>
     </aside>
   );

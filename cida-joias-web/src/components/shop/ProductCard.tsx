@@ -18,24 +18,28 @@ export function ProductCard({ product }: ProductCardProps) {
 
   return (
     <Card className="overflow-hidden flex flex-col h-full hover:shadow-lg transition-shadow group">
-      <div className="relative h-48 w-full bg-gray-100 overflow-hidden">
-        {/* Imagem */}
-        <img 
-          src={getImageUrl(productWinImage)} 
-          alt={product.name}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-        />
-        
-        {/* Badge de Promoção */}
-        {hasDiscount && (
-          <Badge className="absolute top-2 right-2 bg-red-600 hover:bg-red-700">
-            Promoção
-          </Badge>
-        )}
-      </div>
+      <Link href={`/products/${product.id}`} className="cursor-pointer">
+        <div className="relative h-48 w-full bg-gray-100 overflow-hidden">
+          
+          {/* Imagem */}
+          <img 
+            src={getImageUrl(productWinImage)} 
+            alt={product.name}
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+          
+          {/* Badge de Promoção */}
+          {hasDiscount && (
+            <Badge className="absolute top-2 right-2 bg-red-600 hover:bg-red-700">
+              Promoção
+            </Badge>
+          )}
+        </div>
+      </Link>
       
       <CardContent className="flex-1 p-4">
         <div className="mb-2">
+          <Link href={`/products/${product.id}`} className="hover:underline">
             <h3 className="font-semibold text-lg line-clamp-1" title={product.name}>
                 {product.name}
             </h3>
@@ -44,6 +48,7 @@ export function ProductCard({ product }: ProductCardProps) {
                     {product.category.name}
                 </span>
             )}
+          </Link>
         </div>
         
         <p className="text-sm text-gray-500 mb-4 line-clamp-2 min-h-[40px]">

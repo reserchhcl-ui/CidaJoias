@@ -35,7 +35,10 @@ export const authService = {
   },
 
   logout: () => {
-    Cookies.remove(TOKEN_KEY);
-    // O redirecionamento e limpeza da store são feitos na camada de UI/Hook
+    // 1. Remove o cookie forçando o path '/'
+    Cookies.remove(TOKEN_KEY, { path: '/' });
+    
+    // 2. Opcional: Recarrega a página para garantir limpeza de estados em memória do React
+    //window.location.href = '/login'; 
   },
 };

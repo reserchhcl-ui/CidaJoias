@@ -10,17 +10,22 @@ from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
 from . import auth, crud, schemas, security, database
 import os
+
+
 app = FastAPI(
     title="Cida Joias API",
     description="Back-end."
 )
+
+
 products_upload_dir = os.path.join(settings.UPLOAD_DIR, "products")
 os.makedirs(products_upload_dir, exist_ok=True)
 
 origins = [
     "http://localhost:3000",      # Next.js (Web)
     "http://localhost:8081",      # Expo (Mobile - Porta padrão)
-    "http://127.0.0.1:3000",      # Alternativa localhost
+    "http://127.0.0.1:3000",
+    "http://192.168.0.113:3000",      # Alternativa localhost
 ]
 app.mount("/Produtos_Images", StaticFiles(directory=products_upload_dir), name="product_images")
 app.add_middleware(

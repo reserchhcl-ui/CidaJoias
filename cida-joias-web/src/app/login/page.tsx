@@ -40,7 +40,7 @@ export default function LoginPage() {
 
       // 2. Uso simplificado do Toast (Sucesso)
       toast.success(`Bem-vindo de volta, ${user.full_name || user.email}!`);
-
+      
       if (user.role === 'admin') router.push('/admin/dashboard');
       else if (user.role === 'sales_rep') router.push('/sales-cases');
       else router.push('/');
