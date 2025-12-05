@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { ProductForm } from '@/components/admin/ProductForm';
+import { ProductForm } from '../../../../../components/admin/ProductForm';
 import { productService } from '@/services/product-service';
 
 export default function EditProductPage() {

@@ -9,10 +9,10 @@ import { Loader2 } from 'lucide-react';
 // 1. Importar toast do sonner
 import { toast } from 'sonner';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Button } from '../../../components/ui/button';
+import { Input } from '../../../components/ui/input';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../../components/ui/card';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../../../components/ui/form';
 
 import { loginSchema, LoginFormValues } from '@/types/auth';
 import { authService } from '@/services/auth-service';

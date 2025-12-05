@@ -5,12 +5,12 @@ import { Loader2, Package, Calendar, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../../../components/ui/card';
+import { Badge } from '../../../../components/ui/badge';
+import { Separator } from '../../../../components/ui/separator';
 import { dashboardService } from '@/services/dashboard-service';
 import { formatPrice } from '@/lib/utils';
-import { Header } from '@/components/common/Header';
+import { Header } from '../../../../components/common/Header';
 
 export default function MyOrdersPage() {
   const { data: orders, isLoading } = useQuery({

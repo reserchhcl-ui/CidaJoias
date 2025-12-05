@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { Product } from '@/types/product';
 import { formatPrice, getImageUrl } from '@/lib/utils';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardFooter } from '../ui/card';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
 
 interface ProductCardProps {
   product: Product;

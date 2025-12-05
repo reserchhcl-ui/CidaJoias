@@ -5,18 +5,39 @@ import { Loader2, Briefcase, Calendar, Clock, AlertTriangle } from 'lucide-react
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Header } from '@/components/common/Header'; // Podemos criar um Header específico para Vendedora se quiser
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../../../components/ui/card';
+import { Button } from '../../../components/ui/button';
+import { Badge } from '../../../components/ui/badge';
+import { Header } from '../../../components/common/Header'; // Podemos criar um Header específico para Vendedora se quiser
 import { dashboardService } from '@/services/dashboard-service';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function SalesRepDashboard() {
-  const { data: cases, isLoading } = useQuery({
+  const { data: cases, isLoading,isError,error } = useQuery({
     queryKey: ['sales-cases'],
     queryFn: dashboardService.getMySalesCases,
+    retry: false,
   });
+  // Efeito de segurança extra (caso o Axios falhe ou demore)
+  useEffect(() => {
+    if (isError) {
+       // Se o erro for 403, o Axios já deve ter redirecionado, 
+       // mas podemos forçar visualmente ou redirecionar aqui também.
+       console.log("Erro ao carregar estojos:", error);
+    }
+  }, [isError, error]);
 
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+         <div className="text-center p-8">
+            <h2 className="text-xl font-bold text-red-600 mb-2">Acesso Restrito</h2>
+            <p className="text-slate-600">Redirecionando...</p>
+         </div>
+      </div>
+    );
+  };
   return (
     <div className="min-h-screen bg-slate-50">
       <Header />

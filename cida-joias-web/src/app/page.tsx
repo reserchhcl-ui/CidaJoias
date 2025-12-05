@@ -3,9 +3,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { productService } from '@/services/product-service';
-import { Header } from '@/components/common/Header';
-import { ProductCard } from '@/components/shop/ProductCard';
-import { Button } from '@/components/ui/button';
+import { Header } from '../components/common/Header';
+import { ProductCard } from '../components/shop/ProductCard';
+import { Button } from '../components/ui/button';
 
 export default function HomePage() {
   // Busca de Produtos

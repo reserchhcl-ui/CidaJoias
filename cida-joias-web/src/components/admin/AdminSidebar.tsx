@@ -13,7 +13,7 @@ import {
   LogOut, 
   Store 
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '../ui/button';
 import { useAuthStore } from '@/store/use-auth-store';
 
 const sidebarItems = [

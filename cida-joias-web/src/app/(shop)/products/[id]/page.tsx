@@ -5,10 +5,10 @@ import { useQuery } from '@tanstack/react-query';
 import { Loader2, ArrowLeft, ShoppingCart, Check, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Header } from '@/components/common/Header';
+import { Button } from '../../../../components/ui/button';
+import { Badge } from '../../../../components/ui/badge';
+import { Separator } from '../../../../components/ui/separator';
+import { Header } from '../../../../components/common/Header';
 
 import { productService } from '@/services/product-service';
 import { formatPrice, getImageUrl } from '@/lib/utils';
