@@ -1,4 +1,4 @@
-# NOVO ARQUIVO: app/services/storage_service.py
+# app/services/storage_service.py
 
 import shutil
 import os
@@ -14,43 +14,49 @@ class LocalStorageService:
 
     def save_image(self, file: UploadFile, sub_folder: str = "products") -> str:
         """
-        Salva um arquivo de imagem, gera um nome único e retorna a URL relativa.
+        Salva um arquivo de imagem e retorna a URL pública correta.
         """
-        # 1. Sanitização e validação básica
         if not file.content_type.startswith("image/"):
             raise ValueError("File is not a valid image.")
 
-        # 2. Gerar nome único (UUID) para evitar colisão e problemas com nomes de arquivo originais
+        # Gerar nome único
         file_extension = os.path.splitext(file.filename)[1]
         unique_filename = f"{uuid.uuid4()}{file_extension}"
         
-        # 3. Definir caminho final
+        # Definir caminho físico (Onde salvar)
+        # Ex: E:\CidaJoias\uploads\products\uuid.jpg
         destination_folder = self.upload_dir / sub_folder
         destination_folder.mkdir(parents=True, exist_ok=True)
         destination_path = destination_folder / unique_filename
 
-        # 4. Salvar o conteúdo (Streaming para não estourar memória)
         try:
             with destination_path.open("wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
         finally:
             file.file.close()
 
-        # 5. Retornar URL relativa para salvar no banco
-        # Ex: /static/products/d290f1ee-6c54-4b01-90e6-d701748f0851.jpg
+        # --- CORREÇÃO DA URL DE RETORNO ---
+        # Se for produto, usa a rota específica que acabamos de criar
+        if sub_folder == "products":
+            return f"/Produtos_Images/{unique_filename}"
+        
+        # Fallback para outros tipos de arquivo
         return f"/static/{sub_folder}/{unique_filename}"
 
     def delete_image(self, image_url: str):
         """Remove o arquivo físico se existir."""
-        # Converte URL (/static/...) para caminho de arquivo (uploads/...)
         if not image_url:
             return
             
-        clean_path = image_url.replace("/static/", "")
+        # Traduz a URL pública de volta para o caminho do arquivo
+        if "/Produtos_Images/" in image_url:
+            clean_path = image_url.replace("/Produtos_Images/", "products/")
+        else:
+            clean_path = image_url.replace("/static/", "")
+            
         file_path = self.upload_dir / clean_path
         
         if file_path.exists():
             os.remove(file_path)
 
-# Instância padrão (Single Source of Truth)
 storage = LocalStorageService()

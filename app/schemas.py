@@ -32,6 +32,7 @@ class Product(ProductBase):
     category: Optional[Category] = None
     model_config = ConfigDict(from_attributes=True)
 
+
 class ProductCreate(BaseModel):
     name: str
     description: str | None = None

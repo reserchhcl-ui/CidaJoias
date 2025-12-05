@@ -123,3 +123,14 @@ def read_user_by_id(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
+
+@router.post("/logout", status_code=status.HTTP_200_OK)
+def logout(current_user: models.User = Depends(auth.get_current_user)):
+    """
+    Realiza o logout do usuário.
+    
+    Nota: Em arquiteturas JWT Stateless, o token permanece válido até expirar.
+    Este endpoint instrui o cliente a descartar o token e pode ser usado futuramente
+    para adicionar o token a uma 'Blacklist' (Redis) ou limpar cookies HttpOnly.
+    """
+    return {"message": "Successfully logged out"}

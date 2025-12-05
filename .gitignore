@@ -9,7 +9,7 @@ venv/
 
 # production
 /build
-/Produtos_Images
+/uploads
 # misc
 .DS_Store
 .env.local

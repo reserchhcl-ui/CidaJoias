@@ -6,7 +6,8 @@ from sqlalchemy import and_, or_, func
 from datetime import datetime, timezone
 from .base import CRUDBase
 from .. import models, schemas
-
+import string
+import random
 class CRUDProduct(CRUDBase[models.Product, schemas.ProductCreate, schemas.ProductUpdate]):
     
     def get_multi_filtered(
@@ -66,7 +67,21 @@ class CRUDProduct(CRUDBase[models.Product, schemas.ProductCreate, schemas.Produc
         if not barcode:
             return None
         return db.query(self.model).filter(self.model.barcode == barcode).first()
-
+    
+    def generate_unique_barcode(self, db: Session) -> str:
+            """
+            Gera um código alfanumérico de 8 caracteres único (Ex: 'X7Y2Z9A1').
+            Verifica colisões no banco para garantir unicidade.
+            """
+            chars = string.ascii_uppercase + string.digits
+            while True:
+                # Randomiza 8 caracteres
+                code = ''.join(random.choices(chars, k=8))
+                
+                # Verifica se já existe (Colisão é rara, mas possível)
+                if not self.get_by_barcode(db, barcode=code):
+                    return code
+                
     def get_for_update(self, db: Session, product_id: int) -> Optional[models.Product]:
         """
         Busca um produto aplicando um lock pessimista (SELECT ... FOR UPDATE).
