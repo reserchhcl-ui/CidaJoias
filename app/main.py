@@ -25,8 +25,12 @@ origins = [
     "http://localhost:3000",      # Next.js (Web)
     "http://localhost:8081",      # Expo (Mobile - Porta padrão)
     "http://127.0.0.1:3000",
-    "http://192.168.0.113:3000",      # Alternativa localhost
+    "http://192.168.0.113:3000",
+    "http://localhost:19000", # Expo
+    "http://localhost:19006"     # Alternativa localhost
 ]
+
+
 app.mount("/Produtos_Images", StaticFiles(directory=products_upload_dir), name="product_images")
 app.add_middleware(
     CORSMiddleware,

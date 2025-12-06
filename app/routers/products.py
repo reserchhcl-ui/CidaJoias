@@ -52,33 +52,32 @@ def search_products(
 # --- LEITURA (GET) - PÚBLICO ---
 
 # ADIÇÃO: operation_id="read_products" força o nome 'readProducts' no Frontend
-@router.get("/", response_model=List[schemas.Product])
+@router.get("/", response_model=List[schemas.ProductPublic])
 def read_products(
     skip: int = 0, limit: int = 100, 
     db: Session = Depends(get_db),
     pricing_engine: PricingEngine = Depends(get_pricing_engine)
 ):
+    # 1. Busca produtos
     products_from_db = crud.product.get_multi(db, skip=skip, limit=limit)
+    
+    # 2. Calcula preços em lote (OTIMIZADO: 1 Query)
     current_prices = pricing_engine.get_current_prices_for_products(products=products_from_db)
+    
     results = []
     for product in products_from_db:
+        # Pydantic v2 prefere objetos ou dicts. Vamos passar dict para garantir a injeção.
         p_data = {
             "id": product.id,
             "name": product.name,
             "description": product.description,
             "selling_price": product.selling_price,
-            "cost_price": product.cost_price,
             "stock_quantity": product.stock_quantity,
-            "on_loan_quantity": product.on_loan_quantity,
             "barcode": product.barcode,
             "image_url": product.image_url,
             "current_price": current_prices.get(product.id, product.selling_price),
-            "category_id": product.category_id # Inclui category_id
+            # Note: cost_price NÃO é passado aqui
         }
-        # Se carregamos via lazy loading ou eager loading no get_multi
-        if product.category:
-             p_data["category"] = product.category
-
         results.append(p_data)
     return results
 

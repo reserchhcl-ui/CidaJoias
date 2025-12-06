@@ -90,7 +90,7 @@ class Order(Base):
     status = Column(String(50), nullable=False, default="pending")
 
     # --- NOVOS CAMPOS FINANCEIROS ---
-    payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING, nullable=False)
+    payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING, nullable=False,server_default="pending")
     payment_method = Column(String(50), nullable=True) # credit_card, pix
     transaction_id = Column(String(100), nullable=True) # ID externo do gateway
 

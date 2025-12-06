@@ -32,7 +32,17 @@ class Product(ProductBase):
     category: Optional[Category] = None
     model_config = ConfigDict(from_attributes=True)
 
+class ProductPublic(ProductBase):
+    id: int
+    barcode: str | None = None
+    current_price: Decimal # O Frontend precisa disso!
+    
+    model_config = ConfigDict(from_attributes=True)
 
+class Product(ProductPublic):
+    cost_price: Decimal # Só Admin vê isso
+    on_loan_quantity: int # Admin/Sistema vê isso
+    
 class ProductCreate(BaseModel):
     name: str
     description: str | None = None
@@ -105,12 +115,13 @@ class OrderResponse(BaseModel):
     id: int
     user_id: int
     status: str
-    subtotal: Decimal # Novo
-    applied_discount: Decimal # Novo
-    total_amount: Decimal # Novo
+    subtotal: Optional[Decimal] = None
+    applied_discount: Optional[Decimal] = None # Novo
+    total_amount: Optional[Decimal] = None # Novo
     items: List[OrderItemResponse] = [] # (Certifique-se que OrderItemResponse existe)
-
+    payment_status: Optional[str] = "pending" 
     model_config = ConfigDict(from_attributes=True)
+
 
 class SalesCaseItemResponse(BaseModel):
     product_id: int
