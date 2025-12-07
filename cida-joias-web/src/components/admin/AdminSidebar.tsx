@@ -56,23 +56,6 @@ export function AdminSidebar() {
           );
         })}
       </nav>
-
-      <div className="p-4 border-t border-slate-700 space-y-2">
-        <Link href="/">
-          <Button variant="ghost" className="w-full justify-start gap-3 text-slate-400 hover:text-white">
-            <Store className="h-5 w-5" />
-            Ver Loja
-          </Button>
-        </Link>
-        <Link href="/">
-          <Button variant="ghost" className="w-full justify-start gap-3 text-red-400 hover:text-red-300 hover:bg-red-900/20"
-            onClick={logout}
-          >
-            <LogOut className="h-5 w-5" />
-            Sair
-          </Button>
-        </Link>
-      </div>
     </aside>
   );
 }

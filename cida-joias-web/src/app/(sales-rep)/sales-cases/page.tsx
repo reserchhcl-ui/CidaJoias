@@ -8,7 +8,7 @@ import { ptBR } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
 import { Badge } from '../../../components/ui/badge';
-import { Header } from '../../../components/common/Header'; // Podemos criar um Header específico para Vendedora se quiser
+// Podemos criar um Header específico para Vendedora se quiser
 import { dashboardService } from '@/services/dashboard-service';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -40,7 +40,7 @@ export default function SalesRepDashboard() {
   };
   return (
     <div className="min-h-screen bg-slate-50">
-      <Header />
+
       
       <main className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">

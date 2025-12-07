@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import ReactQueryProvider from '@/providers/react-query-provider';
-// 1. Importar o Toaster do Sonner
-import { Toaster } from "../components/ui/sonner"; 
+import { Toaster } from "@/components/ui/sonner"; 
+import { Header } from '@/components/common/Header'; // 1. Importar Header
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -21,9 +21,11 @@ export default function RootLayout({
     <html lang="pt-BR">
       <body className={inter.className}>
         <ReactQueryProvider>
+          {/* 2. Adicionar o Header no topo da aplicação */}
+          <Header />
+          
           {children}
-          {/* 2. Adicionar o componente aqui */}
-          <Toaster richColors position="top-right" /> 
+          <Toaster richColors position="top-center" duration={2000} /> 
         </ReactQueryProvider>
       </body>
     </html>

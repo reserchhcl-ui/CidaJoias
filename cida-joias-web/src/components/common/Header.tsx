@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ShoppingCart, LogOut, User as UserIcon, LayoutDashboard, Loader2, ChevronDown, Store } from 'lucide-react';
+import { ShoppingCart, LogOut, User as UserIcon, LayoutDashboard, Loader2, ChevronDown, Store, UserCog } from 'lucide-react';
 import Cookies from 'js-cookie';
 
 import { Button } from '@/components/ui/button';
@@ -19,33 +19,30 @@ import {
 import { useAuthStore } from '@/store/use-auth-store';
 import { authService } from '@/services/auth-service';
 import { TOKEN_KEY } from '@/lib/api';
+import { CartSheet } from '@/components/shop/CartSheet';
 
 export function Header() {
   const { user, setAuth, logout } = useAuthStore();
   const router = useRouter();
   
-  // Controle de estado local
   const [isMounted, setIsMounted] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
+  const [searchTerm, setSearchTerm] = useState(''); // Estado para busca
 
-  // Efeito 1: Montagem do componente (evita erro de hidratação do Next.js)
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Efeito 2: Sincronização Cookie -> Estado (Auto-Login)
   useEffect(() => {
     const token = Cookies.get(TOKEN_KEY);
     
-    // Se temos token no cookie mas o usuário não está na memória (F5 na página)
     if (token && !user) {
       setIsChecking(true);
       authService.getProfile()
         .then((fetchedUser) => {
-          setAuth(fetchedUser); // Salva no Zustand e atualiza a UI
+          setAuth(fetchedUser);
         })
         .catch(() => {
-          // Se o token for inválido (401), limpamos tudo
           authService.logout(); 
           logout();
         })
@@ -56,12 +53,18 @@ export function Header() {
   }, [user, setAuth, logout]);
 
   const handleLogout = () => {
-    authService.logout(); // Limpa Cookie
-    logout(); // Limpa Zustand
-    window.location.href = '/login'; // Força recarregamento limpo
+    authService.logout();
+    logout();
+    window.location.href = '/login';
   };
 
-  // Função auxiliar para iniciais do nome
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchTerm.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchTerm)}`);
+    }
+  };
+
   const getInitials = (name?: string) => {
     return (name || 'C')
       .split(' ')
@@ -71,7 +74,6 @@ export function Header() {
       .toUpperCase();
   };
 
-  // Se não estiver montado, retorna um esqueleto simples para evitar layout shift
   if (!isMounted) {
     return (
       <header className="border-b bg-white h-16 sticky top-0 z-50">
@@ -93,24 +95,32 @@ export function Header() {
           </span>
         </Link>
 
+        {/* Barra de Busca (Nova) */}
+        <div className="hidden md:flex flex-1 max-w-md mx-8">
+            <form onSubmit={handleSearch} className="relative w-full">
+                {/* Ícone de busca pode ser importado de lucide-react 'Search' se necessário */}
+                <input 
+                    placeholder="Buscar peças..." 
+                    className="w-full pl-4 pr-10 py-2 rounded-full border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+            </form>
+        </div>
+
         {/* Ações da Direita */}
         <div className="flex items-center gap-4">
           
-          {/* Carrinho (Sempre visível) */}
-          <Button variant="ghost" size="icon" className="relative hover:bg-slate-100 rounded-full">
-            <ShoppingCart className="h-5 w-5 text-slate-700" />
-            {/* Futuro: Badge de quantidade */}
-          </Button>
+          {/* Carrinho (Drawer) */}
+          <CartSheet />
           
-          {/* Lógica de Renderização do Usuário */}
+          {/* Menu do Usuário */}
           {isChecking ? (
-            // Estado de "Verificando sessão..."
             <Button variant="ghost" size="sm" disabled>
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
               <span className="sr-only sm:not-sr-only">Carregando...</span>
             </Button>
           ) : user ? (
-            // --- USUÁRIO LOGADO (Menu Dropdown) ---
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="pl-2 pr-4 gap-2 rounded-full hover:bg-slate-100 border border-transparent hover:border-slate-200 transition-all">
@@ -137,7 +147,7 @@ export function Header() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 
-                {/* 🚀 LINK DO ADMIN (Só aparece se role=admin) */}
+                {/* Link Admin */}
                 {user.role === 'admin' && (
                   <>
                     <DropdownMenuItem asChild>
@@ -162,6 +172,14 @@ export function Header() {
                     <DropdownMenuSeparator />
                   </>
                 )}
+                
+                {/* --- NOVO ITEM: MINHA CONTA --- */}
+                <DropdownMenuItem asChild>
+                  <Link href="/account" className="cursor-pointer">
+                    <UserCog className="mr-2 h-4 w-4" />
+                    Minha Conta
+                  </Link>
+                </DropdownMenuItem>
 
                 <DropdownMenuItem asChild>
                   <Link href="/orders/meus-pedidos" className="cursor-pointer">
@@ -182,7 +200,6 @@ export function Header() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            // --- VISITANTE (Botão Entrar) ---
             <Button variant="default" size="sm" asChild className="rounded-full px-6 shadow-md hover:shadow-lg transition-all">
               <Link href="/login">
                 Entrar

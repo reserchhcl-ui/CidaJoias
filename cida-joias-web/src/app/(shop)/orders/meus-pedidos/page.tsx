@@ -10,7 +10,7 @@ import { Badge } from '../../../../components/ui/badge';
 import { Separator } from '../../../../components/ui/separator';
 import { dashboardService } from '@/services/dashboard-service';
 import { formatPrice } from '@/lib/utils';
-import { Header } from '../../../../components/common/Header';
+
 
 export default function MyOrdersPage() {
   const { data: orders, isLoading } = useQuery({
@@ -41,7 +41,6 @@ export default function MyOrdersPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-10">
-      <Header />
       
       <main className="container mx-auto px-4 py-8">
         <div className="mb-6">

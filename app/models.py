@@ -41,8 +41,11 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
-    
-    role = Column(Enum(UserRole), nullable=False, default=UserRole.CUSTOMER)
+    # --- NOVOS CAMPOS DE PERFIL ---
+    full_name = Column(String(150), nullable=True) # Nome completo
+    phone_number = Column(String(20), nullable=True) # (XX) XXXXX-XXXX
+    instagram_handle = Column(String(50), nullable=True) # @usuario
+    role = Column(Enum(UserRole, name="userrole"), nullable=False, default=UserRole.CUSTOMER)
 
     orders = relationship("Order", back_populates="owner")
     sales_cases = relationship("SalesCase", back_populates="sales_rep")
@@ -90,7 +93,12 @@ class Order(Base):
     status = Column(String(50), nullable=False, default="pending")
 
     # --- NOVOS CAMPOS FINANCEIROS ---
-    payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING, nullable=False,server_default="pending")
+    payment_status = Column(
+        Enum(PaymentStatus, name="paymentstatus"), 
+        default=PaymentStatus.PENDING, 
+        nullable=False,
+        server_default="pending"
+    )
     payment_method = Column(String(50), nullable=True) # credit_card, pix
     transaction_id = Column(String(100), nullable=True) # ID externo do gateway
 
@@ -151,7 +159,7 @@ class SalesCase(Base):
     sales_rep_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     loan_date = Column(DateTime(timezone=True), server_default=func.now())
     return_by_date = Column(DateTime(timezone=True), nullable=False)
-    status = Column(Enum(SalesCaseStatus), nullable=False, default=SalesCaseStatus.ON_LOAN)
+    status = Column(Enum(SalesCaseStatus, name="salescasestatus"), nullable=False, default=SalesCaseStatus.ON_LOAN)
 
     sales_rep = relationship("User", back_populates="sales_cases")
     items = relationship("SalesCaseItem", back_populates="case", cascade="all, delete-orphan")
@@ -174,7 +182,7 @@ class Coupon(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     code = Column(String(50), unique=True, index=True, nullable=False)
-    discount_type = Column(Enum(CouponType), nullable=False)
+    discount_type = Column(Enum(CouponType, name="coupontype"), nullable=False)
     discount_value = Column(DECIMAL(10, 2), nullable=False)
     
     max_uses = Column(Integer, nullable=True) # Null = ilimitado

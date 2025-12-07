@@ -27,7 +27,8 @@ origins = [
     "http://127.0.0.1:3000",
     "http://192.168.0.113:3000",
     "http://localhost:19000", # Expo
-    "http://localhost:19006"     # Alternativa localhost
+    "http://localhost:19006"
+    "*"     # Alternativa localhost
 ]
 
 

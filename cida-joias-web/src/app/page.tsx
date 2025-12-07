@@ -3,7 +3,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { productService } from '@/services/product-service';
-import { Header } from '../components/common/Header';
 import { ProductCard } from '../components/shop/ProductCard';
 import { Button } from '../components/ui/button';
 
@@ -22,7 +21,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header />
+
       
       <main className="container mx-auto px-4 py-8">
         {/* Banner / Hero Section Simples */}

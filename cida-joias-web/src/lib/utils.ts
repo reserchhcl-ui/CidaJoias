@@ -26,3 +26,24 @@ export function getImageUrl(path?: string | null): string {
   
   return `${baseUrl}${cleanPath}`;
 }
+
+export const formatPhone = (value: string) => {
+  if (!value) return "";
+  
+  // Remove tudo que não é dígito
+  const v = value.replace(/\D/g, "");
+  
+  // Limita a 11 dígitos
+  const limited = v.slice(0, 11);
+
+  // Aplica a máscara (99) 99999-9999
+  if (limited.length <= 10) {
+    return limited
+      .replace(/(\d{2})(\d)/, "($1) $2")
+      .replace(/(\d{4})(\d)/, "$1-$2");
+  } else {
+    return limited
+      .replace(/(\d{2})(\d)/, "($1) $2")
+      .replace(/(\d{5})(\d)/, "$1-$2");
+  }
+};

@@ -4,11 +4,11 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, ArrowLeft, ShoppingCart, Check, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-
+import { useCartStore } from '@/store/use-cart-store';
 import { Button } from '../../../../components/ui/button';
 import { Badge } from '../../../../components/ui/badge';
 import { Separator } from '../../../../components/ui/separator';
-import { Header } from '../../../../components/common/Header';
+
 
 import { productService } from '@/services/product-service';
 import { formatPrice, getImageUrl } from '@/lib/utils';
@@ -16,6 +16,7 @@ import { formatPrice, getImageUrl } from '@/lib/utils';
 export default function ProductDetailsPage() {
   const router = useRouter();
   const params = useParams();
+  const addItem = useCartStore((state) => state.addItem);
   // Garante que o ID seja numérico
   const productId = Number(params.id);
 
@@ -26,14 +27,16 @@ export default function ProductDetailsPage() {
   });
 
   const handleAddToCart = () => {
+    if (product) {
+      addItem(product);
     // Futuramente integraremos com o Zustand aqui
     toast.success(`"${product?.name}" adicionado ao carrinho!`);
+    }
   };
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
-        <Header />
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
         </div>
@@ -44,7 +47,6 @@ export default function ProductDetailsPage() {
   if (isError || !product) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
-        <Header />
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
           <AlertCircle className="h-12 w-12 text-red-500" />
           <h2 className="text-xl font-semibold text-gray-900">Produto não encontrado</h2>
@@ -64,7 +66,7 @@ export default function ProductDetailsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-10">
-      <Header />
+
 
       <main className="container mx-auto px-4 py-8">
         {/* Botão Voltar */}
