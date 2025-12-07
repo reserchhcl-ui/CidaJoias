@@ -1,5 +1,5 @@
 import { Product } from './product';
-
+import { UserProfile } from './auth'
 // --- Tipos para Pedidos (Cliente Final) ---
 export interface OrderItem {
   id: number;
@@ -21,6 +21,7 @@ export interface Order {
 export interface SalesCaseItem {
   product_id: number;
   quantity: number;
+  product?: Product;
   // O backend pode retornar detalhes do produto aqui se usarmos expand, 
   // mas o schema básico SalesCaseItemResponse tem apenas ids. 
   // O ideal seria o backend retornar o nome, mas buscaremos produtos se necessário.
@@ -31,6 +32,7 @@ export interface SalesCase {
   sales_rep_id: number;
   loan_date: string;
   return_by_date: string;
-  status: 'on_loan' | 'returned' | 'settled';
+  status: 'on_loan' | 'returned' | 'settled' | 'overdue';
   items: SalesCaseItem[];
+  sales_rep?: UserProfile;
 }

@@ -121,7 +121,7 @@ export function CartSheet() {
               </div>
             </ScrollArea>
 
-            <div className="pt-4">
+            <div className="pt-1">
               <Separator className="mb-4" />
               <div className="px-3 flex justify-between text-base font-medium mb-4">
                 <span>Subtotal</span>

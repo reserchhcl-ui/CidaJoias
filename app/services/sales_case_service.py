@@ -123,3 +123,135 @@ class SalesCaseService:
             if isinstance(e, (SalesCaseLogicError, SalesCaseAuthorizationError)):
                 raise e
             raise SalesCaseLogicError(f"An unexpected error occurred during case return processing: {e}")
+    
+    def add_item_to_case(self, *, case_id: int, item_in: schemas.SalesCaseItemAdd) -> models.SalesCase:
+        """
+        Adiciona itens a um estojo existente.
+        Resolve barcode, valida estoque e atualiza 'on_loan_quantity'.
+        """
+        # 1. Validar Estojo
+        db_case = crud.sales_case.get(self.db, case_id=case_id)
+        if not db_case:
+            raise SalesCaseLogicError("Sales case not found.")
+        
+        if db_case.status != SalesCaseStatus.ON_LOAN:
+            raise SalesCaseLogicError("Cannot add items to a closed/returned case.")
+
+        # 2. Resolver Produto (ID ou Barcode)
+        product = None
+        if item_in.product_id:
+            product = crud.product.get(self.db, id=item_in.product_id)
+        elif item_in.barcode:
+            product = crud.product.get_by_barcode(self.db, barcode=item_in.barcode)
+        
+        if not product:
+            raise SalesCaseLogicError(f"Product not found (ID: {item_in.product_id}, Barcode: {item_in.barcode})")
+
+        # 3. Validar Estoque
+        # Estoque Disponível = Físico - Consignado
+        available_stock = product.stock_quantity - product.on_loan_quantity
+        if available_stock < item_in.quantity:
+            raise SalesCaseLogicError(f"Insufficient stock for '{product.name}'. Available: {available_stock}")
+
+        try:
+            # 4. Verificar se já existe no estojo (Soma quantidade) ou cria novo
+            existing_item = crud.sales_case.get_case_item(self.db, case_id=case_id, product_id=product.id)
+            
+            if existing_item:
+                existing_item.quantity += item_in.quantity
+                self.db.add(existing_item)
+            else:
+                crud.sales_case.create_item(self.db, case_id=case_id, product_id=product.id, quantity=item_in.quantity)
+
+            # 5. Atualizar Estoque Consignado Global
+            crud.product.update_stock(self.db, db_product=product, change_in_loan=item_in.quantity)
+            
+            self.db.commit()
+            self.db.refresh(db_case)
+            return db_case
+
+        except Exception as e:
+            self.db.rollback()
+            raise SalesCaseLogicError(f"Error adding item: {str(e)}")
+
+    def update_item_quantity(self, *, case_id: int, product_id: int, quantity: int) -> models.SalesCase:
+        """
+        Atualiza a quantidade de um item no estojo. 
+        Se quantidade == 0, remove o item.
+        Gerencia a devolução ou retirada do estoque global.
+        """
+        db_case = crud.sales_case.get(self.db, case_id=case_id)
+        if not db_case:
+            raise SalesCaseLogicError("Sales case not found.")
+            
+        if db_case.status != SalesCaseStatus.ON_LOAN:
+            raise SalesCaseLogicError("Cannot edit items in a closed/returned case.")
+
+        item = crud.sales_case.get_case_item(self.db, case_id=case_id, product_id=product_id)
+        if not item:
+            raise SalesCaseLogicError("Item not found in this sales case.")
+
+        product = item.product # Já carregado pelo relationship
+        
+        # Calcular a diferença (Delta)
+        # Ex: Tinha 5, agora quer 8. Delta = +3 (Precisa tirar 3 do estoque)
+        # Ex: Tinha 5, agora quer 2. Delta = -3 (Precisa devolver 3 pro estoque)
+        delta = quantity - item.quantity
+
+        if delta > 0:
+            # Validar se tem estoque para o aumento
+            available = product.stock_quantity - product.on_loan_quantity
+            if available < delta:
+                raise SalesCaseLogicError(f"Insufficient stock to increase quantity. Available: {available}")
+
+        try:
+            if quantity == 0:
+                # Remover item
+                crud.sales_case.remove_item(self.db, db_item=item)
+            else:
+                # Atualizar quantidade
+                item.quantity = quantity
+                self.db.add(item)
+
+            # Atualizar Estoque Global (Delta positivo aumenta o on_loan, negativo diminui)
+            crud.product.update_stock(self.db, db_product=product, change_in_loan=delta)
+
+            self.db.commit()
+            self.db.refresh(db_case)
+            return db_case
+
+        except Exception as e:
+            self.db.rollback()
+            raise SalesCaseLogicError(f"Error updating item: {str(e)}")
+        
+    def delete_case(self, *, case_id: int) -> None:
+            """
+            Remove um estojo do sistema.
+            Se o estojo estiver ON_LOAN, devolve os itens para o estoque disponível
+            antes de excluir, evitando inconsistência de inventário.
+            """
+            db_case = crud.sales_case.get(self.db, case_id=case_id)
+            if not db_case:
+                raise SalesCaseLogicError("Sales case not found.")
+
+            try:
+                # Se o estojo ainda está com a vendedora, precisamos "liberar" os produtos
+                # que estavam travados como 'consignados'.
+                if db_case.status == SalesCaseStatus.ON_LOAN:
+                    for item in db_case.items:
+                        # change_in_loan negativo = libera do consignado volta pro disponível
+                        # change_in_stock zero = o físico não muda (já estava no físico, só reservado)
+                        crud.product.update_stock(
+                            self.db, 
+                            db_product=item.product, 
+                            change_in_loan=-item.quantity
+                        )
+
+                # Remove o estojo (Items são removidos por cascade no DB)
+                crud.sales_case.remove(self.db, case_id=case_id)
+                
+                self.db.commit()
+                
+            except Exception as e:
+                self.db.rollback()
+                raise SalesCaseLogicError(f"Error deleting sales case: {str(e)}")

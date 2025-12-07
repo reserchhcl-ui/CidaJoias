@@ -75,6 +75,28 @@ class CRUDSalesCase:
         db_case.status = status
         db.add(db_case)
         return db_case
+    
+    def get_case_item(self, db: Session, *, case_id: int, product_id: int) -> Optional[models.SalesCaseItem]:
+        """Busca um item específico dentro de um estojo."""
+        return (
+            db.query(models.SalesCaseItem)
+            .filter(
+                models.SalesCaseItem.case_id == case_id,
+                models.SalesCaseItem.product_id == product_id
+            )
+            .first()
+        )
+
+    def remove_item(self, db: Session, *, db_item: models.SalesCaseItem) -> None:
+        """Remove um item do estojo."""
+        db.delete(db_item)
+
+    def remove(self, db: Session, *, case_id: int) -> models.SalesCase:
+        """Remove um estojo do banco de dados."""
+        obj = db.query(models.SalesCase).get(case_id)
+        db.delete(obj)
+        # O commit será feito pelo Service para garantir a transação completa
+        return obj
 
 # Instância única para ser importada
 sales_case = CRUDSalesCase()

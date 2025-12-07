@@ -34,7 +34,7 @@ def read_my_orders(
     skip: int = 0,
     limit: int = 25,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.require_customer_user)
+    current_user: models.User = Depends(auth.get_current_user)
 ):
     """
     Obtém o histórico de pedidos para o cliente logado.
@@ -50,7 +50,7 @@ def read_my_orders(
 @router.post("/pedidos", response_model=schemas.OrderResponse, status_code=status.HTTP_201_CREATED, tags=["Public Checkout"])
 def public_checkout(
     checkout_request: schemas.CheckoutRequest,
-    current_user: models.User = Depends(auth.require_customer_user),
+    current_user: models.User = Depends(auth.get_current_user),
     order_service: OrderService = Depends(get_order_service)
 ):
     try:

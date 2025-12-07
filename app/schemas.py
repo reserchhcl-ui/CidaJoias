@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict,field_validator
+from pydantic import BaseModel, Field, ConfigDict,field_validator,model_validator
 from typing import List,Optional
 from datetime import datetime
 from decimal import Decimal
@@ -84,7 +84,7 @@ class User(UserBase):
 class UserUpdate(BaseModel):
     email: Optional[str] = None
     password: Optional[str] = Field(None, min_length=8)
-    role: UserRole = UserRole.CUSTOMER # Apenas admin deveria conseguir alterar isso via API
+    role: Optional[UserRole] = None # Apenas admin deveria conseguir alterar isso via API
     full_name: Optional[str] = None
     phone_number: Optional[str] = None
     instagram_handle: Optional[str] = None
@@ -125,6 +125,7 @@ class OrderResponse(BaseModel):
     subtotal: Optional[Decimal] = None
     applied_discount: Optional[Decimal] = None # Novo
     total_amount: Optional[Decimal] = None # Novo
+    created_at: datetime | None = None
     items: List[OrderItemResponse] = [] # (Certifique-se que OrderItemResponse existe)
     payment_status: Optional[str] = "pending" 
     model_config = ConfigDict(from_attributes=True)
@@ -184,6 +185,23 @@ class SalesCaseReturnReport(BaseModel):
     total_items_sold: int
     total_value_sold: float
     items_summary: List[ItemReturnSummary]
+
+class SalesCaseItemAdd(BaseModel):
+    """
+    Schema flexível: Aceita ID ou Barcode.
+    """
+    product_id: Optional[int] = None
+    barcode: Optional[str] = None
+    quantity: int = Field(..., gt=0, description="Quantidade a adicionar")
+
+    @model_validator(mode='after')
+    def check_identifier(self):
+        if not self.product_id and not self.barcode:
+            raise ValueError('É necessário fornecer product_id ou barcode.')
+        return self
+
+class SalesCaseItemUpdate(BaseModel):
+    quantity: int = Field(..., ge=0, description="Nova quantidade absoluta. Se 0, remove o item.")
 
 class CheckoutItem(BaseModel):
     product_id: int

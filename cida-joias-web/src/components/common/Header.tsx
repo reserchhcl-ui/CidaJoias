@@ -17,25 +17,30 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 import { useAuthStore } from '@/store/use-auth-store';
+import { useCartStore } from '@/store/use-cart-store'; // Importamos a store do carrinho
 import { authService } from '@/services/auth-service';
 import { TOKEN_KEY } from '@/lib/api';
-import { CartSheet } from '@/components/shop/CartSheet';
 
 export function Header() {
   const { user, setAuth, logout } = useAuthStore();
+  // Pegamos apenas os items para calcular o contador
+  const cartItems = useCartStore((state) => state.items);
+  
   const router = useRouter();
   
   const [isMounted, setIsMounted] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(''); // Estado para busca
+  const [searchTerm, setSearchTerm] = useState('');
 
+  // Sincronização e Hidratação
   useEffect(() => {
     setIsMounted(true);
+    // Hidrata o carrinho manualmente para garantir sync com localStorage no client
+    useCartStore.persist.rehydrate();
   }, []);
 
   useEffect(() => {
     const token = Cookies.get(TOKEN_KEY);
-    
     if (token && !user) {
       setIsChecking(true);
       authService.getProfile()
@@ -74,6 +79,9 @@ export function Header() {
       .toUpperCase();
   };
 
+  // Cálculo de Itens (apenas no client para evitar erro de hidratação)
+  const itemCount = isMounted ? cartItems.reduce((acc, item) => acc + item.quantity, 0) : 0;
+
   if (!isMounted) {
     return (
       <header className="border-b bg-white h-16 sticky top-0 z-50">
@@ -95,10 +103,9 @@ export function Header() {
           </span>
         </Link>
 
-        {/* Barra de Busca (Nova) */}
+        {/* Barra de Busca */}
         <div className="hidden md:flex flex-1 max-w-md mx-8">
             <form onSubmit={handleSearch} className="relative w-full">
-                {/* Ícone de busca pode ser importado de lucide-react 'Search' se necessário */}
                 <input 
                     placeholder="Buscar peças..." 
                     className="w-full pl-4 pr-10 py-2 rounded-full border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
@@ -111,14 +118,22 @@ export function Header() {
         {/* Ações da Direita */}
         <div className="flex items-center gap-4">
           
-          {/* Carrinho (Drawer) */}
-          <CartSheet />
+          {/* BOTÃO DO CARRINHO (Agora um Link direto) */}
+          <Button variant="ghost" size="icon" className="relative hover:bg-slate-100 rounded-full" asChild>
+            <Link href="/cart">
+              <ShoppingCart className="h-5 w-5 text-slate-700" />
+              {itemCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-5 w-5 bg-primary text-white text-xs font-bold rounded-full flex items-center justify-center animate-in zoom-in">
+                  {itemCount}
+                </span>
+              )}
+            </Link>
+          </Button>
           
           {/* Menu do Usuário */}
           {isChecking ? (
             <Button variant="ghost" size="sm" disabled>
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              <span className="sr-only sm:not-sr-only">Carregando...</span>
             </Button>
           ) : user ? (
             <DropdownMenu>
@@ -147,11 +162,10 @@ export function Header() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 
-                {/* Link Admin */}
                 {user.role === 'admin' && (
                   <>
                     <DropdownMenuItem asChild>
-                      <Link href="/admin/dashboard" className="w-full cursor-pointer font-medium text-purple-600 focus:text-purple-700 focus:bg-purple-50">
+                      <Link href="/admin/dashboard" className="w-full cursor-pointer font-medium text-purple-600">
                         <LayoutDashboard className="mr-2 h-4 w-4" />
                         Painel Admin
                       </Link>
@@ -160,11 +174,10 @@ export function Header() {
                   </>
                 )}
 
-                {/* Link Vendedora */}
                 {user.role === 'sales_rep' && (
                   <>
                     <DropdownMenuItem asChild>
-                      <Link href="/sales-cases" className="w-full cursor-pointer font-medium text-blue-600 focus:text-blue-700 focus:bg-blue-50">
+                      <Link href="/sales-cases" className="w-full cursor-pointer font-medium text-blue-600">
                         <LayoutDashboard className="mr-2 h-4 w-4" />
                         Meus Estojos
                       </Link>
@@ -173,7 +186,6 @@ export function Header() {
                   </>
                 )}
                 
-                {/* --- NOVO ITEM: MINHA CONTA --- */}
                 <DropdownMenuItem asChild>
                   <Link href="/account" className="cursor-pointer">
                     <UserCog className="mr-2 h-4 w-4" />

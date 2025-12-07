@@ -45,15 +45,26 @@ export default function ProfilePage() {
   async function onSubmit(data: ProfileFormValues) {
     setIsLoading(true);
     try {
-      const updatedUser = await authService.updateProfile(data);
+      // --- CORREÇÃO AQUI ---
+      // Criamos um payload explícito para garantir que 'role', 'id', etc. NÃO sejam enviados.
+      // O backend bloqueia se receber o campo 'role', mesmo que o valor não tenha mudado.
+      const payload = {
+        full_name: data.full_name,
+        email: data.email, // Envie apenas se sua API permitir troca de email neste endpoint
+        phone_number: data.phone_number,
+        instagram_handle: data.instagram_handle,
+      };
+
+      const updatedUser = await authService.updateProfile(payload);
       
-      // Atualiza o store global e o cookie se necessário
       setAuth(updatedUser); 
       
       toast.success("Perfil atualizado com sucesso!");
-    } catch (error) {
+    } catch (error: any) { // Tipagem 'any' para acessar error.response
       console.error(error);
-      toast.error("Erro ao atualizar perfil.");
+      // Tratamento de erro melhorado
+      const errorMsg = error.response?.data?.detail || "Erro ao atualizar perfil.";
+      toast.error(errorMsg);
     } finally {
       setIsLoading(false);
     }

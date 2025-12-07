@@ -14,7 +14,7 @@ export const adminService = {
     const [usersRes, ordersRes, productsRes] = await Promise.all([
       api.get('/users/?skip=0&limit=1000'), // Limite alto para contar (ideal seria endpoint de count)
       api.get('/orders/'),
-      api.get('/products/?limit=1000') // Esse é público, mas compõe o dashboard
+      api.get('/products/?limit=9000') // Esse é público, mas compõe o dashboard
     ]);
 
     const users = usersRes.data;

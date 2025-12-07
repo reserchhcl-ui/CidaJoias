@@ -2,15 +2,19 @@ import api from '@/lib/api';
 import { Category, Product, ProductSearchFilters } from '@/types/product';
 export interface UpdateProductDTO extends Partial<CreateProductDTO> {}
 export interface CreateProductDTO {
-    name: string;
-    description?: string;
-    selling_price: number;
-    cost_price: number;
-    stock_quantity: number;
-    category_id: number;
-    image_url?: string;
-  }
-  
+  name: string;
+  description?: string;
+  selling_price: number;
+  cost_price: number;
+  stock_quantity: number;
+  category_id: number;
+  image_url?: string;
+}
+
+export interface CategoryCreateDTO {
+  name: string;
+  slug: string;
+}
 export const productService = {
   // Listar Categorias
   getCategories: async (): Promise<Category[]> => {
@@ -63,12 +67,20 @@ export const productService = {
     });
     return response.data;
   },
+  createCategory: async (data: CategoryCreateDTO): Promise<Category> => {
+    const response = await api.post<Category>('/categories/', data);
+    return response.data;
+  },
+
+  deleteCategory: async (id: number): Promise<void> => {
+    await api.delete(`/categories/${id}`);
+  },
   
   // Backoffice Dashboard Stats (Se houver endpoint, senão simulamos ou buscamos listas)
   getDashboardStats: async () => {
     // Exemplo: se não tiver endpoint de stats, fazemos várias chamadas
     const [products, orders, salesCases] = await Promise.all([
-        api.get('/products/?limit=1'),
+        api.get('/products/?limit=9999'),
         api.get('/orders/meus-pedidos'), // Ajustar para endpoint de admin se houver
         api.get('/sales-cases/')
     ]);

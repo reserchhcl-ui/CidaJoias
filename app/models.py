@@ -45,6 +45,7 @@ class User(Base):
     full_name = Column(String(150), nullable=True) # Nome completo
     phone_number = Column(String(20), nullable=True) # (XX) XXXXX-XXXX
     instagram_handle = Column(String(50), nullable=True) # @usuario
+    
     role = Column(Enum(UserRole, name="userrole"), nullable=False, default=UserRole.CUSTOMER)
 
     orders = relationship("Order", back_populates="owner")
@@ -101,7 +102,7 @@ class Order(Base):
     )
     payment_method = Column(String(50), nullable=True) # credit_card, pix
     transaction_id = Column(String(100), nullable=True) # ID externo do gateway
-
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     # NOVOS CAMPOS PARA HISTÓRICO FINANCEIRO
     coupon_id = Column(Integer, ForeignKey("coupons.id"), nullable=True)
     applied_discount = Column(DECIMAL(10, 2), default=0.0) # Salva o valor monetário abatido (Ex: 15.00) para auditoria

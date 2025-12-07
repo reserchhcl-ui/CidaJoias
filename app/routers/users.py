@@ -37,17 +37,6 @@ def create_user_endpoint(
         )
     return crud.user.create(db, obj_in=user_in)
 
-# Para manter compatibilidade com a rota /token (que geralmente é raiz), 
-# podemos criar um router separado para auth ou adicionar uma exceção no main.py.
-# Mas vamos assumir que o frontend chama /api/v1/token. 
-# Para isso funcionar dentro deste router com prefixo /users, a rota seria /users/token.
-# VOU CRIAR UMA ROTA ESPECÍFICA SEM O PREFIXO NO MAIN.PY PARA O TOKEN, 
-# OU DEFINIR AQUI COM CAMINHO ABSOLUTO SE O FASTAPI PERMITISSE.
-# SOLUÇÃO: Vamos manter o /token aqui mas sabendo que ele ficará em /api/v1/users/token 
-# SE não mudarmos a estrutura.
-# 
-# POREM, o OAuth2PasswordBearer no auth.py aponta para "token".
-# Vamos criar um endpoint auxiliar /login que redireciona ou faz o mesmo.
 
 @router.post("/login", response_model=schemas.Token)
 def login_access_token(
@@ -90,13 +79,28 @@ def update_user_me(
     current_user: models.User = Depends(auth.get_current_user),
 ):
     """
-    Atualiza o próprio perfil (ex: trocar senha ou email).
+    Atualiza o próprio perfil.
     """
-    # Segurança: Não permitir que usuário mude seu próprio role para admin
-    if user_in.role is not None and current_user.role != models.UserRole.ADMIN:
-        raise HTTPException(status_code=403, detail="You cannot change your own role.")
-        
-    return crud.user.update(db, db_obj=current_user, obj_in=user_in)
+    # 1. Convertemos para DICT para manipular chaves livremente
+    # exclude_unset=True evita que campos não enviados sobrescrevam dados com None
+    update_data = user_in.model_dump(exclude_unset=True)
+
+    # 2. Lógica de Segurança para 'role'
+    if "role" in update_data:
+        # Se não for admin...
+        if current_user.role != models.UserRole.ADMIN:
+            # ...e tentou alterar o papel para outro diferente: PROIBIDO
+            if update_data["role"] != current_user.role:
+                raise HTTPException(status_code=403, detail="You cannot change your own role.")
+            
+            # ...se enviou o mesmo papel (comum em forms de frontend):
+            # REMOVEMOS A CHAVE do dicionário.
+            # Isso impede que o sistema tente gravar 'role' no banco (evitando o erro NotNullViolation se fosse None, 
+            # e evitando uma query de update desnecessária).
+            del update_data["role"]
+
+    # 3. Passamos o dicionário 'update_data' limpo para o CRUD
+    return crud.user.update(db, db_obj=current_user, obj_in=update_data)
 
 # --- ROTAS ADMINISTRATIVAS ---
 
