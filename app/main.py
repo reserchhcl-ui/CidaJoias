@@ -49,6 +49,7 @@ def login_for_access_token(
 ):
     """Endpoint dedicado para login e obtenção de token."""
     user = crud.user.get_by_email(db, email=form_data.username)
+    
     if not user or not security.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -56,10 +57,13 @@ def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # IMPORTANTE: create_access_token agora espera um dicionário com "sub" (email)
-    # Verifique sua implementação em auth.py. 
-    # Se estiver usando user.id ou user.email, ajuste conforme auth.py:
-    # Em auth.py atual: data={"sub": email}
+    # --- VERIFICAÇÃO DE STATUS ---
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Inactive user"
+        )
+    # -----------------------------
     
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(

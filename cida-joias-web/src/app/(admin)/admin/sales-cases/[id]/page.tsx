@@ -1,130 +1,177 @@
 'use client';
 
+import { useState } from 'react'; // Adicionado useState
 import { useParams, useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, ArrowLeft, Calendar, User, Check, X } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'; // Adicionado Mutation e Client
+import { Loader2, ArrowLeft, Mail, Phone, Instagram, Package, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
-import { toast } from 'sonner'; // Importante para o feedback final
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { SalesCaseItemManager } from '@/components/admin/SalesCaseItemManager';
-import { salesCaseService } from '@/services/sales-case-service';
-import { productService } from '@/services/product-service';
-import { userService } from '@/services/user-service';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'; // Adicionado Dialog
 
-export default function EditSalesCasePage() {
+import { UserForm } from '@/components/admin/UserForm'; // Importar o form
+import { userService } from '@/services/user-service';
+import { formatPrice } from '@/lib/utils';
+
+export default function UserDetailsPage() {
   const router = useRouter();
   const params = useParams();
-  const caseId = Number(params.id);
+  const userId = Number(params.id);
   const queryClient = useQueryClient();
+  
+  // Estado para controlar o modal de edição
+  const [isEditing, setIsEditing] = useState(false);
 
-  // ... (Queries de dados permanecem iguais)
-  const { data: salesCase, isLoading: isLoadingCase } = useQuery({
-    queryKey: ['sales-case', caseId],
-    queryFn: () => salesCaseService.getCaseById(caseId),
-    enabled: !!caseId,
+  const { data: user, isLoading: isLoadingUser } = useQuery({
+    queryKey: ['admin-user', userId],
+    queryFn: () => userService.getUserById(userId),
   });
 
-  const { data: allProducts, isLoading: isLoadingProducts } = useQuery({
-    queryKey: ['admin-products-full'],
-    queryFn: () => productService.getProducts(0, 2000),
+  const { data: orders, isLoading: isLoadingOrders } = useQuery({
+    queryKey: ['admin-user-orders', userId],
+    queryFn: () => userService.getUserOrders(userId),
   });
 
-  const { data: users } = useQuery({
-    queryKey: ['admin-users'],
-    queryFn: userService.getAllUsers,
+  // Mutação para atualizar o usuário direto desta tela
+  const updateMutation = useMutation({
+    mutationFn: (data: any) => userService.updateUser(userId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-user', userId] });
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] }); // Atualiza a lista geral também
+      toast.success("Usuário atualizado com sucesso!");
+      setIsEditing(false);
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.detail || "Erro ao atualizar.");
+    },
   });
 
-  // Handler de Conclusão com Refresh
-  const handleFinish = () => {
-    // 1. Invalida a lista de estojos para garantir que ela mostre os totais atualizados
-    queryClient.invalidateQueries({ queryKey: ['admin-cases'] });
-    
-    // 2. Feedback visual
-    toast.success("Estojo salvo com sucesso!");
-    
-    // 3. Redirecionamento (O router.push força a navegação, e o invalidate garante os dados novos)
-    router.push('/admin/sales-cases');
-    
-    // Opcional: router.refresh() força um soft-reload dos componentes do servidor
-    router.refresh();
-  };
-
-  if (isLoadingCase || isLoadingProducts || !salesCase) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <span className="ml-3 text-slate-500">Carregando estojo...</span>
-      </div>
-    );
+  if (isLoadingUser || isLoadingOrders) {
+    return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
   }
 
-  const salesRepName = users?.find(u => u.id === salesCase.sales_rep_id)?.full_name || `ID: ${salesCase.sales_rep_id}`;
-  const totalItems = salesCase.items.reduce((acc, item) => acc + item.quantity, 0);
+  if (!user) return <div>Usuário não encontrado.</div>;
 
   return (
-    <div className="space-y-6 pb-24">
-      
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
-            <ArrowLeft className="h-5 w-5" />
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <Button variant="ghost" onClick={() => router.back()} className="gap-2">
+            <ArrowLeft className="h-4 w-4" /> Voltar
         </Button>
-        <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                Gerenciar Estojo #{salesCase.id}
-            </h1>
-            <Badge variant={salesCase.status === 'on_loan' ? 'secondary' : 'outline'} className="ml-2">
-                {salesCase.status === 'on_loan' ? 'Emprestado' : salesCase.status}
-            </Badge>
-        </div>
+        
+        {/* Botão de Editar na Página de Detalhes */}
+        <Button onClick={() => setIsEditing(true)} variant="outline" className="gap-2">
+            <Pencil className="h-4 w-4" /> Editar Usuário
+        </Button>
       </div>
 
-      {/* Info Card (Mantido igual) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-4 rounded-lg border shadow-sm">
-            <div className="flex items-center gap-3">
-                <div className="bg-purple-100 p-2 rounded-full text-purple-600">
-                    <User className="h-5 w-5" />
+      <div className="grid md:grid-cols-3 gap-6">
+        {/* Card de Perfil */}
+        <Card className="md:col-span-1 h-fit">
+            <CardHeader>
+                <CardTitle>Perfil do Usuário</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div className="flex flex-col items-center p-4 bg-slate-50 rounded-lg mb-4 text-center">
+                    <div className="h-16 w-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-2xl font-bold mb-2">
+                        {user.full_name?.[0] || user.email[0].toUpperCase()}
+                    </div>
+                    <h2 className="font-bold text-lg">{user.full_name || 'Sem Nome'}</h2>
+                    <div className="flex gap-2 justify-center mt-1">
+                        <Badge variant="secondary">{user.role}</Badge>
+                        {!user.is_active && <Badge variant="destructive">Inativo</Badge>}
+                    </div>
                 </div>
-                <div>
-                    <p className="text-xs text-slate-500">Vendedora</p>
-                    <p className="font-semibold">{salesRepName}</p>
+                
+                <div className="space-y-3 text-sm">
+                    <div className="flex items-center gap-2 text-slate-600">
+                        <Mail className="h-4 w-4 text-slate-400" /> 
+                        <span className="truncate">{user.email}</span>
+                    </div>
+                    {user.phone_number ? (
+                        <div className="flex items-center gap-2 text-slate-600">
+                            <Phone className="h-4 w-4 text-slate-400" /> {user.phone_number}
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 text-slate-400 italic">
+                            <Phone className="h-4 w-4 opacity-50" /> Sem telefone
+                        </div>
+                    )}
+                    {user.instagram_handle ? (
+                        <div className="flex items-center gap-2 text-slate-600">
+                            <Instagram className="h-4 w-4 text-slate-400" /> {user.instagram_handle}
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 text-slate-400 italic">
+                            <Instagram className="h-4 w-4 opacity-50" /> Sem instagram
+                        </div>
+                    )}
                 </div>
-            </div>
-            <div className="flex items-center gap-3">
-                <div className="bg-blue-100 p-2 rounded-full text-blue-600">
-                    <Calendar className="h-5 w-5" />
-                </div>
-                <div>
-                    <p className="text-xs text-slate-500">Data de Retorno</p>
-                    <p className="font-semibold">{format(new Date(salesCase.return_by_date), "dd/MM/yyyy")}</p>
-                </div>
-            </div>
-            <div className="flex items-center gap-3">
-                <div className="bg-green-100 p-2 rounded-full text-green-600">
-                    <span className="font-bold text-lg px-1">{totalItems}</span>
-                </div>
-                <div>
-                    <p className="text-xs text-slate-500">Total de Peças</p>
-                    <p className="font-semibold text-green-700">Itens no Estojo</p>
-                </div>
-            </div>
+            </CardContent>
+        </Card>
+
+        {/* Lista de Pedidos (Igual ao anterior) */}
+        <Card className="md:col-span-2">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5" /> Histórico de Pedidos ({orders?.length || 0})
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                {orders?.length === 0 ? (
+                    <p className="text-slate-500 text-center py-10">Nenhum pedido encontrado para este usuário.</p>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>ID</TableHead>
+                                    <TableHead>Data</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead className="text-right">Total</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {orders?.map(order => (
+                                    <TableRow key={order.id}>
+                                        <TableCell>#{order.id}</TableCell>
+                                        <TableCell>
+                                            {order.created_at ? format(new Date(order.created_at), "dd/MM/yyyy") : "-"}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline">{order.status}</Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right font-bold">
+                                            {formatPrice(order.total_amount)}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
       </div>
 
-      {/* Item Manager */}
-      <SalesCaseItemManager salesCase={salesCase} allProducts={allProducts || []} />
-
-      {/* BARRA DE AÇÕES (Rodapé Atualizado) */}
-      <div className="fixed bottom-0 left-0 md:left-64 right-0 p-4 bg-white border-t flex justify-end gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-10">
-          <Button variant="outline" onClick={() => router.back()}>
-             <X className="mr-2 h-4 w-4" /> Cancelar
-          </Button>
-          <Button onClick={handleFinish} className="bg-green-600 hover:bg-green-700 w-full md:w-auto">
-             <Check className="mr-2 h-4 w-4" /> Concluir e Salvar
-          </Button>
-      </div>
-
+      {/* Modal de Edição (Reutilizando UserForm) */}
+      <Dialog open={isEditing} onOpenChange={setIsEditing}>
+        <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+                <DialogTitle>Editar Usuário</DialogTitle>
+            </DialogHeader>
+            <UserForm 
+                initialData={user}
+                isSubmitting={updateMutation.isPending}
+                onSubmit={(data) => updateMutation.mutate(data)}
+                onCancel={() => setIsEditing(false)}
+            />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

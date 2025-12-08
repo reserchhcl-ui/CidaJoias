@@ -78,8 +78,25 @@ class UserCreate(UserBase):
 class User(UserBase):
     id: int
     role: UserRole
-    # is_active: bool = True # Poderíamos adicionar no futuro
+    full_name: Optional[str] = None
+    phone_number: Optional[str] = None 
+    instagram_handle: Optional[str] = None
+    is_active: bool = True # Poderíamos adicionar no futuro
+    @field_validator('phone_number', mode='before')
+    @classmethod
+    def empty_string_to_none(cls, v):
+        if v == "":
+            return None
+        return v
     model_config = ConfigDict(from_attributes=True)
+
+class UserUpdateAdmin(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
+    instagram_handle: Optional[str] = None
+    role: Optional[UserRole] = None
+    is_active: Optional[bool] = None
 
 class UserUpdate(BaseModel):
     email: Optional[str] = None

@@ -1,25 +1,24 @@
+# app/auth.py
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from typing import List
-# Importar nossos modelos e schemas
+
 from app.crud import user as crud_user_instance
 from . import models, schemas, database
 from .models import UserRole
 from .core.config import settings
 
-# --- Configuração do JWT (Token) ---
-
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
-# Define o "esquema" de autenticação
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/token")
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
-    """Cria um novo token JWT."""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
@@ -29,12 +28,10 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-# --- Dependências (Dependencies) ---
-
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(database.get_db)):
     """
     Dependência para validar o token e retornar o usuário atual.
-    Usaremos isso para proteger endpoints.
+    Verifica se o usuário existe E se está ATIVO.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -54,24 +51,26 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     
     if user is None:
         raise credentials_exception
+    
+    # --- BLOQUEIO DE USUÁRIO INATIVO ---
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Inactive user"
+        )
+    # -----------------------------------
+    
     return user
 
-async def get_current_admin_user(current_user: schemas.User = Depends(get_current_user)):
-    """
-    Dependência que REQUER que o usuário atual seja um admin.
-    """
+async def get_current_admin_user(current_user: models.User = Depends(get_current_user)):
     if current_user.role != UserRole.ADMIN:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, 
-                detail="The user does not have administrative privileges"
-            )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="The user does not have administrative privileges"
+        )
     return current_user
 
 def require_role(required_roles: List[UserRole]):
-    """
-    Uma fábrica de dependências que cria uma dependência que requer que o 
-    utilizador tenha um dos 'roles' especificados.
-    """
     def role_checker(current_user: models.User = Depends(get_current_user)):
         if current_user.role not in required_roles:
             raise HTTPException(
@@ -81,7 +80,6 @@ def require_role(required_roles: List[UserRole]):
         return current_user
     return role_checker
 
-# Agora podemos criar dependências específicas e reutilizáveis
 require_admin_user = require_role([UserRole.ADMIN])
 require_sales_rep_user = require_role([UserRole.SALES_REP])
 require_admin_or_sales_rep = require_role([UserRole.ADMIN, UserRole.SALES_REP])

@@ -5,7 +5,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import timedelta
-
+from ..crud import order as crud_order
 from .. import models, schemas, auth, security, crud
 from ..core.config import settings
 from ..database import get_db
@@ -81,25 +81,21 @@ def update_user_me(
     """
     Atualiza o próprio perfil.
     """
-    # 1. Convertemos para DICT para manipular chaves livremente
-    # exclude_unset=True evita que campos não enviados sobrescrevam dados com None
     update_data = user_in.model_dump(exclude_unset=True)
 
-    # 2. Lógica de Segurança para 'role'
-    if "role" in update_data:
-        # Se não for admin...
-        if current_user.role != models.UserRole.ADMIN:
-            # ...e tentou alterar o papel para outro diferente: PROIBIDO
+    # SEGURANÇA: Usuário comum não pode mudar Role nem Status (is_active)
+    if current_user.role != models.UserRole.ADMIN:
+        # Verifica Role
+        if "role" in update_data:
             if update_data["role"] != current_user.role:
                 raise HTTPException(status_code=403, detail="You cannot change your own role.")
-            
-            # ...se enviou o mesmo papel (comum em forms de frontend):
-            # REMOVEMOS A CHAVE do dicionário.
-            # Isso impede que o sistema tente gravar 'role' no banco (evitando o erro NotNullViolation se fosse None, 
-            # e evitando uma query de update desnecessária).
             del update_data["role"]
+        
+        # Verifica Is_Active (Proteção contra inativação acidental ou maliciosa via API pública)
+        if "is_active" in update_data:
+            # Ignora a tentativa de mudança se não for admin
+            del update_data["is_active"]
 
-    # 3. Passamos o dicionário 'update_data' limpo para o CRUD
     return crud.user.update(db, db_obj=current_user, obj_in=update_data)
 
 # --- ROTAS ADMINISTRATIVAS ---
@@ -138,3 +134,62 @@ def logout(current_user: models.User = Depends(auth.get_current_user)):
     para adicionar o token a uma 'Blacklist' (Redis) ou limpar cookies HttpOnly.
     """
     return {"message": "Successfully logged out"}
+
+@router.put("/{user_id}", response_model=schemas.User, dependencies=[Depends(auth.require_admin_user)])
+def update_user(
+    user_id: int,
+    user_in: schemas.UserUpdate,
+    db: Session = Depends(get_db),
+):
+    """
+    (Admin) Atualiza dados de qualquer usuário.
+    Permite alterar roles (promover/rebaixar) e dados cadastrais.
+    """
+    user = crud.user.get(db, id=user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    return crud.user.update(db, db_obj=user, obj_in=user_in)
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(auth.require_admin_user)])
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(auth.get_current_admin_user) # Só para garantir acesso ao objeto admin se precisar
+):
+    """
+    (Admin) Remove um usuário do sistema.
+    """
+    user = crud.user.get(db, id=user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Segurança: Evitar que o admin se delete acidentalmente
+    if user.id == current_admin.id:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account.")
+        
+    crud.user.remove(db, id=user_id)
+    return None
+
+@router.get("/{user_id}/orders", response_model=List[schemas.OrderResponse], dependencies=[Depends(auth.require_admin_user)])
+def read_user_orders_by_admin(
+    user_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+):
+    """
+    (Admin) Visualiza o histórico de pedidos de um usuário específico.
+    """
+    user = crud.user.get(db, id=user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # CORREÇÃO AQUI: Removido o .order extra
+    orders = crud_order.get_orders_by_customer(
+        db=db, 
+        user_id=user_id, 
+        skip=skip, 
+        limit=limit
+    )
+    return orders
