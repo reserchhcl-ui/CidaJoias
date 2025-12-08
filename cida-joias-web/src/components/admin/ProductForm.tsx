@@ -75,7 +75,7 @@ export function ProductForm({ initialData }: ProductFormProps) {
       selling_price: initialData?.selling_price || 0,
       cost_price: initialData?.cost_price || 0,
       stock_quantity: initialData?.stock_quantity || 0,
-      barcode: initialData?.barcode || '', // O backend ignora se for string vazia na criação
+      barcode: initialData?.barcode, // O backend ignora se for string vazia na criação
       category_id: initialData?.category_id || 0,
     },
   });

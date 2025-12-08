@@ -2,9 +2,9 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Plus, Minus, Trash2, ScanBarcode, Search, AlertCircle, Save } from 'lucide-react';
+import { Loader2, Plus, Minus, Trash2, ScanBarcode, Search, AlertCircle, Save,Camera } from 'lucide-react';
 import { toast } from 'sonner';
-
+import { BarcodeScanner } from '@/components/common/BarcodeScanner'; // Importar o scanner
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,7 +38,7 @@ export function SalesCaseItemManager({ salesCase, allProducts }: SalesCaseItemMa
   const [isProcessing, setIsProcessing] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<number | null>(null); // Estado para o Modal
   const inputRef = useRef<HTMLInputElement>(null);
-
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
@@ -104,6 +104,22 @@ export function SalesCaseItemManager({ salesCase, allProducts }: SalesCaseItemMa
     }
   };
 
+  const handleScanSuccess = (decodedText: string) => {
+    // Toca um som de "beep" (opcional, melhora UX)
+    const audio = new Audio('/beep.mp3'); audio.play();
+
+    toast.success(`Código lido: ${decodedText}`);
+    
+    // Preenche o input
+    setBarcodeInput(decodedText);
+    
+    // Fecha o scanner
+    setIsScannerOpen(false);
+    
+    // Dispara a mutação automaticamente
+    addItemMutation.mutate({ barcode: decodedText, quantity: 1 });
+  };
+
   return (
     <>
       <Card className="border-t-4 border-t-blue-600 shadow-md">
@@ -113,25 +129,49 @@ export function SalesCaseItemManager({ salesCase, allProducts }: SalesCaseItemMa
                   <ScanBarcode className="h-6 w-6 text-blue-600" />
                   Gestão de Itens
               </CardTitle>
-              
-              <form onSubmit={handleBarcodeSubmit} className="flex gap-2 w-full md:w-auto">
-                  <div className="relative w-full md:w-96">
-                      <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
-                      <Input 
-                          ref={inputRef}
-                          placeholder="Bipe o código de barras ou digite..." 
-                          className="pl-10 font-mono text-lg h-10 border-blue-200 focus:border-blue-500 ring-offset-0 focus-visible:ring-blue-500"
-                          value={barcodeInput}
-                          onChange={(e) => setBarcodeInput(e.target.value)}
-                          disabled={isProcessing}
-                          autoComplete="off"
-                      />
-                  </div>
-                  <Button type="submit" size="lg" disabled={isProcessing || !barcodeInput}>
-                      {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
-                  </Button>
-              </form>
-          </div>
+            {/* AREA DE INPUT E CAMERA */}
+            <div className="flex flex-col w-full md:w-auto gap-2">
+                
+                {/* Botão para abrir câmera (Só aparece se estiver fechada) */}
+                {!isScannerOpen && (
+                    <div className="flex gap-2 w-full md:w-auto">
+                        <div className="relative w-full md:w-80">
+                            <Search className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+                            <Input 
+                                ref={inputRef}
+                                placeholder="Bipe, digite ou use a câmera..." 
+                                className="pl-10 font-mono text-lg h-10 border-blue-200 focus:border-blue-500"
+                                value={barcodeInput}
+                                onChange={(e) => setBarcodeInput(e.target.value)}
+                                disabled={isProcessing}
+                                autoComplete="off"
+                            />
+                        </div>
+                        <Button 
+                            type="button" // Type button para não submeter o form
+                            variant="outline"
+                            onClick={() => setIsScannerOpen(true)}
+                            title="Ler com Câmera"
+                        >
+                            <Camera className="h-5 w-5" />
+                        </Button>
+                        <Button type="button" onClick={handleBarcodeSubmit} disabled={isProcessing || !barcodeInput}>
+                            {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
+                        </Button>
+                    </div>
+                )}
+            </div>
+        </div>
+        
+        {/* COMPONENTE DO SCANNER (Renderização Condicional) */}
+        {isScannerOpen && (
+            <div className="mt-4 p-4 border rounded-md bg-slate-100">
+                <BarcodeScanner 
+                    onScanSuccess={handleScanSuccess} 
+                    onClose={() => setIsScannerOpen(false)} 
+                />
+            </div>
+        )}
         </CardHeader>
         
         <CardContent className="p-0">
