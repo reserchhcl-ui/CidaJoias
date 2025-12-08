@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ShoppingCart, LogOut, User as UserIcon, LayoutDashboard, Loader2, ChevronDown, Store, UserCog } from 'lucide-react';
+import { ShoppingCart, LogOut, User as UserIcon, LayoutDashboard, Loader2, ChevronDown, Store, UserCog, Search } from 'lucide-react';
 import Cookies from 'js-cookie';
 
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -17,13 +18,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 import { useAuthStore } from '@/store/use-auth-store';
-import { useCartStore } from '@/store/use-cart-store'; // Importamos a store do carrinho
+import { useCartStore } from '@/store/use-cart-store';
 import { authService } from '@/services/auth-service';
 import { TOKEN_KEY } from '@/lib/api';
 
 export function Header() {
   const { user, setAuth, logout } = useAuthStore();
-  // Pegamos apenas os items para calcular o contador
   const cartItems = useCartStore((state) => state.items);
   
   const router = useRouter();
@@ -31,11 +31,12 @@ export function Header() {
   const [isMounted, setIsMounted] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Estado para controlar o dropdown de busca mobile
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  // Sincronização e Hidratação
   useEffect(() => {
     setIsMounted(true);
-    // Hidrata o carrinho manualmente para garantir sync com localStorage no client
     useCartStore.persist.rehydrate();
   }, []);
 
@@ -66,6 +67,7 @@ export function Header() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchTerm.trim()) {
+      setIsSearchOpen(false); // Fecha o dropdown se estiver aberto
       router.push(`/search?q=${encodeURIComponent(searchTerm)}`);
     }
   };
@@ -79,7 +81,6 @@ export function Header() {
       .toUpperCase();
   };
 
-  // Cálculo de Itens (apenas no client para evitar erro de hidratação)
   const itemCount = isMounted ? cartItems.reduce((acc, item) => acc + item.quantity, 0) : 0;
 
   if (!isMounted) {
@@ -96,19 +97,21 @@ export function Header() {
     <header className="border-b bg-white sticky top-0 z-50 shadow-sm">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 group">
+        <Link href="/" className="flex items-center gap-2 group mr-4">
           <Store className="h-6 w-6 text-primary group-hover:text-purple-600 transition-colors" />
           <span className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
             CidaJoias
           </span>
         </Link>
 
-        {/* Barra de Busca */}
+        {/* --- BUSCA DESKTOP (Expandida) --- */}
+        {/* hidden md:flex = Esconde no mobile, mostra no desktop */}
         <div className="hidden md:flex flex-1 max-w-md mx-8">
             <form onSubmit={handleSearch} className="relative w-full">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                 <input 
                     placeholder="Buscar peças..." 
-                    className="w-full pl-4 pr-10 py-2 rounded-full border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
+                    className="w-full pl-10 pr-4 py-2 rounded-full border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -116,9 +119,39 @@ export function Header() {
         </div>
 
         {/* Ações da Direita */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           
-          {/* BOTÃO DO CARRINHO (Agora um Link direto) */}
+          {/* --- BUSCA MOBILE (Botão Lupa + Dropdown) --- */}
+          {/* md:hidden = Mostra no mobile, esconde no desktop */}
+          <div className="md:hidden">
+            <DropdownMenu open={isSearchOpen} onOpenChange={setIsSearchOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-slate-700 hover:bg-slate-100 rounded-full">
+                  <Search className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[300px] p-4">
+                <form onSubmit={handleSearch} className="flex flex-col gap-2">
+                  <DropdownMenuLabel>O que você procura?</DropdownMenuLabel>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                    <Input 
+                      placeholder="Buscar..." 
+                      className="pl-9"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      autoFocus // Foca automaticamente ao abrir
+                    />
+                  </div>
+                  <Button type="submit" size="sm" className="w-full mt-2">
+                    Buscar
+                  </Button>
+                </form>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Carrinho */}
           <Button variant="ghost" size="icon" className="relative hover:bg-slate-100 rounded-full" asChild>
             <Link href="/cart">
               <ShoppingCart className="h-5 w-5 text-slate-700" />

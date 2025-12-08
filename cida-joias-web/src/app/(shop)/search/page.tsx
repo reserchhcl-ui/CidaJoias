@@ -8,7 +8,7 @@ import { Suspense, useMemo } from 'react';
 import { ProductFilters } from '@/components/shop/ProductFilters';
 import { ProductCard } from '@/components/shop/ProductCard';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger,SheetTitle, SheetHeader } from '@/components/ui/sheet';
 import { productService } from '@/services/product-service';
 import { ProductSearchFilters } from '@/types/product';
 
@@ -49,22 +49,24 @@ function SearchContent() {
     router.replace(`/search?${params.toString()}`, { scroll: false });
   };
 
-  return (
+return (
     <div className="flex flex-col md:flex-row gap-8">
       {/* Sidebar Desktop */}
       <aside className="hidden md:block w-64 flex-shrink-0">
         <div className="sticky top-24">
-            <ProductFilters filters={filters} onFilterChange={handleFilterChange} />
+            {/* Prefixo DESKTOP */}
+            <ProductFilters 
+                filters={filters} 
+                onFilterChange={handleFilterChange} 
+                idPrefix="desktop" 
+            />
         </div>
       </aside>
 
       {/* Conteúdo Principal */}
       <div className="flex-1">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">
-              Resultados da Busca
-              {products && <span className="ml-2 text-sm font-normal text-gray-500">({products.length} itens)</span>}
-          </h1>
+          {/* ... Título ... */}
 
           {/* Filtro Mobile */}
           <Sheet>
@@ -74,13 +76,21 @@ function SearchContent() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left">
-                <div className="mt-6">
-                  <ProductFilters filters={filters} onFilterChange={handleFilterChange} />
+                <SheetHeader>
+                    <SheetTitle>Filtros de Busca</SheetTitle>
+                </SheetHeader>
+                
+                <div className="flex flex-col gap-1.5 p-4">
+                  {/* Prefixo MOBILE */}
+                  <ProductFilters 
+                    filters={filters} 
+                    onFilterChange={handleFilterChange} 
+                    idPrefix="mobile" 
+                  />
                 </div>
             </SheetContent>
           </Sheet>
         </div>
-
         {/* Grid de Resultados */}
         {isLoading && !products ? (
           <div className="flex justify-center py-20">

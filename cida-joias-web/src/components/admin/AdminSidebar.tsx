@@ -4,16 +4,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { 
-  LayoutDashboard, 
-  Package, 
-  Tags, 
-  ShoppingBag, 
-  Briefcase, 
-  Users, 
-  LogOut, 
-  Store 
+  LayoutDashboard, Package, Tags, ShoppingBag, 
+  Briefcase, Users, LogOut, Store 
 } from 'lucide-react';
-import { Button } from '../ui/button';
+import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/store/use-auth-store';
 
 const sidebarItems = [
@@ -25,21 +19,33 @@ const sidebarItems = [
   { icon: Users, label: 'Usuários', href: '/admin/users' },
 ];
 
-export function AdminSidebar() {
+interface AdminSidebarProps {
+  isMobile?: boolean;
+  onNavigate?: () => void; // Nova prop para fechar o menu
+}
+
+export function AdminSidebar({ isMobile = false, onNavigate }: AdminSidebarProps) {
   const pathname = usePathname();
   const { logout } = useAuthStore();
 
   return (
-    <aside className="hidden md:flex flex-col w-64 border-r bg-slate-900 text-white min-h-screen">
+    <aside className={cn(
+        "flex-col w-64 bg-slate-900 text-white h-full",
+        !isMobile ? "hidden md:flex border-r min-h-screen" : "flex w-full"
+    )}>
       <div className="p-6 border-b border-slate-700">
         <h2 className="text-2xl font-bold tracking-tight">CidaJoias <span className="text-xs font-normal text-slate-400">Admin</span></h2>
       </div>
 
-      <nav className="flex-1 p-4 space-y-2">
+      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         {sidebarItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
           return (
-            <Link key={item.href} href={item.href}>
+            <Link 
+              key={item.href} 
+              href={item.href}
+              onClick={onNavigate} // Fecha o menu ao clicar
+            >
               <Button
                 variant="ghost"
                 className={cn(
@@ -56,6 +62,26 @@ export function AdminSidebar() {
           );
         })}
       </nav>
+
+      <div className="p-4 border-t border-slate-700 space-y-2">
+        <Link href="/" onClick={onNavigate}>
+          <Button variant="ghost" className="w-full justify-start gap-3 text-slate-400 hover:text-white">
+            <Store className="h-5 w-5" />
+            Ver Loja
+          </Button>
+        </Link>
+        <Button 
+          variant="ghost" 
+          className="w-full justify-start gap-3 text-red-400 hover:text-red-300 hover:bg-red-900/20"
+          onClick={() => {
+            if (onNavigate) onNavigate();
+            logout();
+          }}
+        >
+          <LogOut className="h-5 w-5" />
+          Sair
+        </Button>
+      </div>
     </aside>
   );
 }

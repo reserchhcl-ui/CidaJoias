@@ -24,27 +24,25 @@ import { formatPrice } from '@/lib/utils';
 interface ProductFiltersProps {
   filters: ProductSearchFilters;
   onFilterChange: (newFilters: ProductSearchFilters) => void;
+  idPrefix?: string; // NOVA PROP
 }
 
-export function ProductFilters({ filters, onFilterChange }: ProductFiltersProps) {
+export function ProductFilters({ filters, onFilterChange, idPrefix = 'filter' }: ProductFiltersProps) {
   const { data: categories } = useQuery({
     queryKey: ['categories'],
     queryFn: productService.getCategories,
   });
 
   const { register, watch, setValue, reset } = useForm<ProductSearchFilters>({
-    defaultValues: filters // Inicia com os valores vindos da URL
+    defaultValues: filters 
   });
 
-  // 1. Sincronização Reversa: URL mudou (ex: botão voltar)? Atualiza o form visual.
   useEffect(() => {
     reset(filters);
   }, [filters, reset]);
 
-  // 2. Observer: Mudou algo no form? Notifica o pai (que atualizará a URL)
   useEffect(() => {
     const subscription = watch((value) => {
-      // Pequeno debounce para não atualizar a URL a cada milissegundo enquanto arrasta o slider
       const timeoutId = setTimeout(() => {
          onFilterChange(value as ProductSearchFilters);
       }, 500);
@@ -65,7 +63,6 @@ export function ProductFilters({ filters, onFilterChange }: ProductFiltersProps)
     onFilterChange(emptyFilters);
   };
 
-  // Valores atuais para renderizar o UI (Slider, Checkboxes)
   const currentValues = watch();
 
   return (
@@ -83,6 +80,7 @@ export function ProductFilters({ filters, onFilterChange }: ProductFiltersProps)
           placeholder="Buscar peça..."
           className="pl-8"
           {...register('search_term')}
+          // Input do react-hook-form não precisa de ID manual para label aqui, pois tem placeholder
         />
       </div>
 
@@ -94,20 +92,20 @@ export function ProductFilters({ filters, onFilterChange }: ProductFiltersProps)
             <div className="space-y-2">
               <div className="flex items-center space-x-2">
                 <Checkbox 
-                  id="cat-all" 
+                  id={`${idPrefix}-cat-all`} // ID ÚNICO
                   checked={!currentValues.category_id}
                   onCheckedChange={() => setValue('category_id', undefined)}
                 />
-                <Label htmlFor="cat-all" className="cursor-pointer">Todas</Label>
+                <Label htmlFor={`${idPrefix}-cat-all`} className="cursor-pointer">Todas</Label>
               </div>
               {categories?.map((cat) => (
                 <div key={cat.id} className="flex items-center space-x-2">
                   <Checkbox 
-                    id={`cat-${cat.id}`} 
+                    id={`${idPrefix}-cat-${cat.id}`} // ID ÚNICO
                     checked={Number(currentValues.category_id) === cat.id}
                     onCheckedChange={() => setValue('category_id', cat.id)}
                   />
-                  <Label htmlFor={`cat-${cat.id}`} className="cursor-pointer">{cat.name}</Label>
+                  <Label htmlFor={`${idPrefix}-cat-${cat.id}`} className="cursor-pointer">{cat.name}</Label>
                 </div>
               ))}
             </div>
@@ -142,11 +140,11 @@ export function ProductFilters({ filters, onFilterChange }: ProductFiltersProps)
           <AccordionContent>
             <div className="flex items-center space-x-2">
               <Checkbox 
-                id="promotions" 
+                id={`${idPrefix}-promotions`} // ID ÚNICO
                 checked={currentValues.only_promotions}
                 onCheckedChange={(checked) => setValue('only_promotions', checked as boolean)}
               />
-              <Label htmlFor="promotions" className="cursor-pointer font-medium text-red-600">
+              <Label htmlFor={`${idPrefix}-promotions`} className="cursor-pointer font-medium text-red-600">
                 Apenas Promoções
               </Label>
             </div>
