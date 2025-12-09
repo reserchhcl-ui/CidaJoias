@@ -24,8 +24,10 @@ export interface UpdateCaseItemDTO {
 
 export const salesCaseService = {
   // Listar todos
-  getAllCases: async (): Promise<SalesCase[]> => {
-    const response = await api.get<SalesCase[]>('/sales-cases/');
+  getAllCases: async (status?: 'on_loan' | 'returned' | 'overdue'): Promise<SalesCase[]> => {
+    // Monta a query string se houver status
+    const query = status ? `?status=${status}` : '';
+    const response = await api.get<SalesCase[]>(`/sales-cases/${query}`);
     return response.data;
   },
 

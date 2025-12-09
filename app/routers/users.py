@@ -16,13 +16,6 @@ router = APIRouter(
     tags=["Users"]
 )
 
-# --- ROTAS PÚBLICAS OU DE AUTENTICAÇÃO ---
-
-# Nota: O endpoint de token geralmente fica na raiz ou em /auth, 
-# mas se o frontend espera em /users/token ou /token direto, precisamos alinhar.
-# O padrão no main.py é incluir este router. Se o router tem prefix="/users", 
-# a rota abaixo vira "/users/register".
-
 @router.post("/register", response_model=schemas.User, status_code=status.HTTP_201_CREATED)
 def create_user_endpoint(
     user_in: schemas.UserCreate, 
@@ -138,17 +131,16 @@ def logout(current_user: models.User = Depends(auth.get_current_user)):
 @router.put("/{user_id}", response_model=schemas.User, dependencies=[Depends(auth.require_admin_user)])
 def update_user(
     user_id: int,
-    user_in: schemas.UserUpdate,
+    user_in: schemas.UserUpdateAdmin,
     db: Session = Depends(get_db),
 ):
-    """
-    (Admin) Atualiza dados de qualquer usuário.
-    Permite alterar roles (promover/rebaixar) e dados cadastrais.
-    """
+    """(Admin) Atualiza dados de qualquer usuário (incluindo ativar/desativar)."""
     user = crud.user.get(db, id=user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
+    # O schema UserUpdate agora tem is_active, então o crud.user.update
+    # vai receber esse campo automaticamente e atualizar o banco.
     return crud.user.update(db, db_obj=user, obj_in=user_in)
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(auth.require_admin_user)])

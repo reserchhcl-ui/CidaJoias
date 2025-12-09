@@ -45,8 +45,10 @@ class User(Base):
     full_name = Column(String(150), nullable=True) # Nome completo
     phone_number = Column(String(20), nullable=True) # (XX) XXXXX-XXXX
     instagram_handle = Column(String(50), nullable=True) # @usuario
-    is_active = Column(Boolean, default=True, nullable=False)
+
     role = Column(Enum(UserRole, name="userrole"), nullable=False, default=UserRole.CUSTOMER)
+
+    is_active = Column(Boolean, default=True, nullable=False)
 
     orders = relationship("Order", back_populates="owner")
     sales_cases = relationship("SalesCase", back_populates="sales_rep")

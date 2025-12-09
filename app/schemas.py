@@ -81,7 +81,7 @@ class User(UserBase):
     full_name: Optional[str] = None
     phone_number: Optional[str] = None 
     instagram_handle: Optional[str] = None
-    is_active: bool = True # Poderíamos adicionar no futuro
+    is_active: bool = True 
     @field_validator('phone_number', mode='before')
     @classmethod
     def empty_string_to_none(cls, v):

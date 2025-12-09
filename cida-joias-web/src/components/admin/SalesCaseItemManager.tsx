@@ -106,7 +106,7 @@ export function SalesCaseItemManager({ salesCase, allProducts }: SalesCaseItemMa
 
   const handleScanSuccess = (decodedText: string) => {
     // Toca um som de "beep" (opcional, melhora UX)
-    const audio = new Audio('/beep.mp3'); audio.play();
+    //const audio = new Audio('/beep.mp3'); audio.play();
 
     toast.success(`Código lido: ${decodedText}`);
     

@@ -25,6 +25,7 @@ export const userService = {
     return response.data;
   },
 
+
   // Atualizar (Admin)
   updateUser: async (id: number, data: AdminUpdateUserDTO): Promise<UserProfile> => {
     const response = await api.put<UserProfile>(`/users/${id}`, data);
