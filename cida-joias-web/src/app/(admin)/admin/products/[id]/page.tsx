@@ -1,50 +1,66 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
-import { ProductForm } from '../../../../../components/admin/ProductForm';
+import { toast } from 'sonner';
+
+import { ProductForm } from '@/components/admin/ProductForm';
 import { productService } from '@/services/product-service';
 
 export default function EditProductPage() {
+  const router = useRouter();
   const params = useParams();
-  // Assegura que o id é um número
   const productId = Number(params.id);
+  const queryClient = useQueryClient();
 
-  // Busca os dados do produto pelo ID
-  const { data: product, isLoading, isError } = useQuery({
-    queryKey: ['product', productId],
-    queryFn: () => productService.getProductById(productId),
-    enabled: !!productId, // Só roda se tiver ID
+  // 1. Buscar Produto (Admin Route)
+  const { data: product, isLoading: isLoadingProduct } = useQuery({
+    queryKey: ['admin-product', productId],
+    queryFn: () => productService.getProductAdminById(productId),
+    enabled: !!productId,
   });
 
-  if (isLoading) {
+  // 2. CORREÇÃO: Buscar Categorias também na edição
+  const { data: categories, isLoading: isLoadingCategories } = useQuery({
+    queryKey: ['categories'],
+    queryFn: productService.getCategories,
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (data: any) => productService.updateProduct(productId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-products'] });
+      toast.success('Produto atualizado!');
+      router.push('/admin/products');
+    },
+    onError: () => toast.error('Erro ao atualizar produto.'),
+  });
+
+  if (isLoadingProduct || isLoadingCategories) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2 text-gray-500">Carregando dados do produto...</span>
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     );
   }
 
-  if (isError || !product) {
-    return (
-      <div className="p-8 text-center text-red-500">
-        Erro ao carregar produto. Verifique se ele existe ou tente novamente.
-      </div>
-    );
-  }
+  if (!product) return <div>Produto não encontrado.</div>;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Editar Produto</h1>
-        <p className="text-muted-foreground">
-          Alterar informações do produto #{product.id} - {product.name}
-        </p>
+    <div className="max-w-4xl mx-auto py-6">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Editar Produto</h1>
+        <p className="text-slate-500">#{product.id} - {product.name}</p>
       </div>
 
-      <ProductForm initialData={product} />
+      <ProductForm 
+        initialData={product}
+        categories={categories || []} // Passa as categorias
+        isSubmitting={updateMutation.isPending}
+        onSubmit={(data) => updateMutation.mutate(data)}
+        onCancel={() => router.back()}
+      />
     </div>
   );
 }

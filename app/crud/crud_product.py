@@ -1,14 +1,79 @@
 # ARQUIVO ATUALIZADO: app/crud/crud_product.py
 
 from sqlalchemy.orm import Session,joinedload
-from typing import List, Optional
+from typing import List, Optional, Union, Dict, Any
 from sqlalchemy import and_, or_, func
 from datetime import datetime, timezone
 from .base import CRUDBase
 from .. import models, schemas
 import string
 import random
+
+
 class CRUDProduct(CRUDBase[models.Product, schemas.ProductCreate, schemas.ProductUpdate]):
+    
+    def create(self, db: Session, *, obj_in: schemas.ProductCreate) -> models.Product:
+            """Criação com geração automática de Barcode e Cod_Cat."""
+            obj_in_data = obj_in.model_dump()
+            
+            if not obj_in_data.get("barcode"):
+                obj_in_data["barcode"] = self.generate_unique_barcode(db)
+
+            db_obj = self.model(**obj_in_data)
+            db.add(db_obj)
+            db.flush() # Gera o ID
+            
+            # Gera cod_cat inicial (Ex: BRI100)
+            if db_obj.category_id:
+                self._update_cod_cat_logic(db, db_obj, db_obj.category_id)
+
+            db.commit()
+            db.refresh(db_obj)
+            return db_obj
+
+    def update(
+        self, 
+        db: Session, 
+        *, 
+        db_obj: models.Product, 
+        obj_in: Union[schemas.ProductUpdate, Dict[str, Any]]
+    ) -> models.Product:
+        """
+        Atualização com recálculo inteligente do Cod_Cat.
+        """
+        if isinstance(obj_in, dict):
+            update_data = obj_in
+        else:
+            update_data = obj_in.model_dump(exclude_unset=True)
+
+        # --- LÓGICA DE CORREÇÃO DE CATEGORIA ---
+        # Verifica se 'category_id' está sendo alterado
+        if "category_id" in update_data:
+            new_cat_id = update_data["category_id"]
+            
+            # Só recalcula se o ID for diferente do atual
+            if new_cat_id != db_obj.category_id:
+                if new_cat_id is not None:
+                    # Busca a nova categoria para pegar o prefixo (Ex: "Colares" -> "COL")
+                    category = db.query(models.Category).get(new_cat_id)
+                    if category:
+                        prefix = category.name[:3].upper()
+                        # Atualiza o código no payload antes de salvar (Ex: "COL" + "100")
+                        update_data["cod_cat"] = f"{prefix}{db_obj.id}"
+                else:
+                    # Se removeu a categoria, remove o código
+                    update_data["cod_cat"] = None
+        # ---------------------------------------
+
+        return super().update(db, db_obj=db_obj, obj_in=update_data)
+
+    def _update_cod_cat_logic(self, db: Session, db_product: models.Product, category_id: int):
+        """Helper interno para gerar o código."""
+        category = db.query(models.Category).get(category_id)
+        if category:
+            prefix = category.name[:3].upper()
+            db_product.cod_cat = f"{prefix}{db_product.id}"
+            db.add(db_product)
     
     def get_multi_filtered(
         self, 
@@ -76,7 +141,7 @@ class CRUDProduct(CRUDBase[models.Product, schemas.ProductCreate, schemas.Produc
             chars = string.ascii_uppercase + string.digits
             while True:
                 # Randomiza 8 caracteres
-                code = ''.join(random.choices(chars, k=8))
+                code = ''.join(random.choices(chars, k=6))
                 
                 # Verifica se já existe (Colisão é rara, mas possível)
                 if not self.get_by_barcode(db, barcode=code):
@@ -118,6 +183,30 @@ class CRUDProduct(CRUDBase[models.Product, schemas.ProductCreate, schemas.Produc
         product.stock_quantity -= quantity
         db.add(product)
         return product
+    
+    def get_inventory_stats(self, db: Session) -> schemas.InventoryStats:
+            """
+            Calcula estatísticas globais do inventário:
+            - Quantidade total em estoque físico
+            - Quantidade total consignada (on_loan)
+            - Valor total do estoque (baseado no preço de custo)
+            - Valor total consignado (baseado no preço de custo)
+            """
+            # Query otimizada que faz o cálculo no banco de dados
+            stats = db.query(
+                func.sum(models.Product.stock_quantity).label("total_stock"),
+                func.sum(models.Product.on_loan_quantity).label("total_loan"),
+                func.sum(models.Product.stock_quantity * models.Product.cost_price).label("value_stock"),
+                func.sum(models.Product.on_loan_quantity * models.Product.cost_price).label("value_loan")
+            ).first()
+
+            # Tratamento para banco vazio (retorna None se não houver produtos)
+            return schemas.InventoryStats(
+                total_stock_quantity=stats.total_stock or 0,
+                total_on_loan_quantity=stats.total_loan or 0,
+                total_stock_value=stats.value_stock or 0.0,
+                total_on_loan_value=stats.value_loan or 0.0
+            )
 
 # Instância exportada para ser usada nos Routers e Services
 product = CRUDProduct(models.Product)

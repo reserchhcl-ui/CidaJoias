@@ -41,7 +41,7 @@ export default function AdminProductsPage() {
   // 1. Busca de Produtos
   const { data: products, isLoading } = useQuery({
     queryKey: ['admin-products'],
-    queryFn: () => productService.getProducts(0, 100), // Pega 100 itens iniciais
+    queryFn: () => productService.getProductsAdmin(0, 9999), // Pega 100 itens iniciais
   });
 
   // 2. Mutação para Deletar

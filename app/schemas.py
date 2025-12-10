@@ -8,59 +8,73 @@ from .models import UserRole, CouponType
 class CategoryBase(BaseModel):
     name: str
     slug: str
+    description: Optional[str] = None # Novo: Descrição para IA/SEO
     
 class CategoryCreate(CategoryBase):
-    pass
+    parent_id: Optional[int] = None # Novo: Criação de sub-categoria
+
+class BarcodeResponse(BaseModel):
+    barcode: str
 
 class Category(CategoryBase):
     id: int
+    parent_id: Optional[int] = None
+    sub_categories: List['Category'] = [] # Novo: Recursividade para árvore
     model_config = ConfigDict(from_attributes=True)
-
+    
 class ProductBase(BaseModel):
+    """Campos comuns visíveis para todos."""
     name: str
-    description: str | None = None 
+    description: str | None = None
     selling_price: Decimal
-    stock_quantity: int
+    stock_quantity: int # Cliente vê estoque (ex: "apenas 2 restantes") ou booleano
     image_url: str | None = None
-    category_id: int | None = None # Link opcional para criação
+    category_id: int | None = None
+    cod_cat: str | None = None
 
-class Product(ProductBase):
+
+class ProductPublic(ProductBase):
+    """
+    VIEW DO CLIENTE (LOJA):
+    - Oculta: cost_price, supplier_ref, barcode interno
+    - Mostra: Preço calculado (current_price)
+    """
     id: int
-    barcode: str | None = None
-    current_price: float 
-    cost_price: float # Admins podem querer ver isso
+    current_price: Decimal # Calculado pelo PricingEngine
     category: Optional[Category] = None
     model_config = ConfigDict(from_attributes=True)
 
-class ProductPublic(ProductBase):
-    id: int
-    barcode: str | None = None
-    current_price: Decimal # O Frontend precisa disso!
-    
-    model_config = ConfigDict(from_attributes=True)
-
 class Product(ProductPublic):
-    cost_price: Decimal # Só Admin vê isso
-    on_loan_quantity: int # Admin/Sistema vê isso
+    """
+    VIEW DO ADMIN (BACKOFFICE):
+    - Mostra TUDO (herda do Public + campos sensíveis)
+    """
+    cost_price: Decimal
+    on_loan_quantity: int
+    barcode: str | None = None
+    supplier_ref: str | None = None # Novo
     
-class ProductCreate(BaseModel):
-    name: str
-    description: str | None = None
+class ProductCreate(ProductBase):
+    """Campos necessários para cadastro."""
     selling_price: Decimal = Field(..., gt=0)
-    cost_price: Decimal = Field(..., gt=0)
+    category_id: int | None = None
+    cost_price: Decimal = Field(..., gt=0) # Obrigatório no cadastro
+    supplier_ref: Optional[str] = None        # Novo: Opcional
     stock_quantity: int = 0
     barcode: str | None = None
-    image_url: str | None = None
 
 class ProductUpdate(BaseModel):
+    """Todos os campos opcionais para edição."""
     name: str | None = None
     description: str | None = None
-    selling_price: Decimal | None = None 
-    cost_price: Decimal | None = None    # Adicionado
+    selling_price: Decimal | None = None
+    cost_price: Decimal | None = None
+    supplier_ref: str | None = None # Novo
     stock_quantity: int | None = None
     barcode: str | None = None
     image_url: str | None = None
     category_id: int | None = None
+    cod_cat: str | None = None
 
 class UserBase(BaseModel):
     email: str
@@ -71,17 +85,15 @@ class UserBase(BaseModel):
 # Schema para criar um usuário (pede uma senha)
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8, max_length=999)
-    full_name: Optional[str] = None
     role: UserRole = UserRole.CUSTOMER
+    is_active: bool = True
 
 # Schema para ler/retornar um usuário (NUNCA retorne a senha)
 class User(UserBase):
     id: int
     role: UserRole
-    full_name: Optional[str] = None
-    phone_number: Optional[str] = None 
-    instagram_handle: Optional[str] = None
-    is_active: bool = True 
+    is_active: bool
+    
     @field_validator('phone_number', mode='before')
     @classmethod
     def empty_string_to_none(cls, v):
@@ -101,10 +113,11 @@ class UserUpdateAdmin(BaseModel):
 class UserUpdate(BaseModel):
     email: Optional[str] = None
     password: Optional[str] = Field(None, min_length=8)
-    role: Optional[UserRole] = None # Apenas admin deveria conseguir alterar isso via API
     full_name: Optional[str] = None
     phone_number: Optional[str] = None
     instagram_handle: Optional[str] = None
+    role: Optional[UserRole] = None
+    is_active: Optional[bool] = None
 # --- Schemas de Autenticação ---
 
 class Token(BaseModel):
@@ -253,6 +266,11 @@ class ProductFilter(BaseModel):
     only_promotions: bool = False
     search_term: Optional[str] = None
 
+class InventoryStats(BaseModel):
+    total_stock_quantity: int
+    total_on_loan_quantity: int
+    total_stock_value: Decimal  # Valor monetário (Preço de Custo * Qtd)
+    total_on_loan_value: Decimal # Valor monetário na rua (Preço de Custo * Qtd)
 # --- SCHEMAS DE CUPOM ---
 
 class CouponBase(BaseModel):

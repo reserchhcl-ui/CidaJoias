@@ -22,7 +22,7 @@ export default function ProductDetailsPage() {
 
   const { data: product, isLoading, isError } = useQuery({
     queryKey: ['product', productId],
-    queryFn: () => productService.getProductById(productId),
+    queryFn: () => productService.getProductPublicById(productId),
     enabled: !!productId,
   });
 
@@ -131,7 +131,7 @@ export default function ProductDetailsPage() {
                 </span>
               )}
               <p className="text-sm text-gray-500 mt-2">
-                Em até 12x de {formatPrice(product.current_price / 12)}
+                Em até 3x de {formatPrice(product.current_price / 3)}
               </p>
             </div>
 

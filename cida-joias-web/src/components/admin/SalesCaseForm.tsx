@@ -19,7 +19,7 @@ import {
 
 import { SalesCase } from '@/types/dashboard';
 import { UserProfile } from '@/types/auth'; // Ou onde estiver definido User
-import { Product } from '@/types/product';
+import { ProductPublic,ProductAdmin } from '@/types/product';
 import { differenceInDays } from 'date-fns';
 
 // Schema Validation
@@ -36,7 +36,7 @@ const salesCaseSchema = z.object({
 interface SalesCaseFormProps {
   initialData?: SalesCase;
   users?: UserProfile[];
-  products?: Product[];
+  products?: ProductAdmin[];
   hideItems?: boolean;
   onSubmit: (data: any) => void;
   isSubmitting: boolean;

@@ -10,7 +10,7 @@ export default function HomePage() {
   // Busca de Produtos
   const { data: products, isLoading, isError } = useQuery({
     queryKey: ['products'],
-    queryFn: () => productService.getProducts(0, 50), // Traz 50 iniciais
+    queryFn: () => productService.getProductsPublic(0, 50), // Traz 50 iniciais
   });
 
   // Busca de Categorias (para menu futuro)

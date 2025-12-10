@@ -24,12 +24,12 @@ import {
 
 import { salesCaseService } from '@/services/sales-case-service';
 import { SalesCase } from '@/types/dashboard';
-import { Product } from '@/types/product';
+import { ProductAdmin } from '@/types/product';
 import { formatPrice, getImageUrl } from '@/lib/utils';
 
 interface SalesCaseItemManagerProps {
   salesCase: SalesCase;
-  allProducts: Product[];
+  allProducts: ProductAdmin[];
 }
 
 export function SalesCaseItemManager({ salesCase, allProducts }: SalesCaseItemManagerProps) {

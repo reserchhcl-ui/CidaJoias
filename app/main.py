@@ -3,7 +3,7 @@
 from fastapi import FastAPI,APIRouter,Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from .core.config import settings
-from .routers import products, users, orders, sales_cases, discounts, recommendations, categories, coupons, addresses ,shipping, payments
+from .routers import products, products_admin,users, orders, sales_cases, discounts, recommendations, categories, coupons, addresses ,shipping, payments
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
@@ -75,6 +75,7 @@ app.mount("/static", StaticFiles(directory=settings.UPLOAD_DIR), name="static")
 # 2. Incluir os routers na nossa aplicação principal
 api_router.include_router(users.router)
 api_router.include_router(products.router)
+api_router.include_router(products_admin.router)
 api_router.include_router(categories.router)
 api_router.include_router(orders.router)
 api_router.include_router(sales_cases.router)

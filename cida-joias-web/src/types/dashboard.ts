@@ -1,4 +1,4 @@
-import { Product } from './product';
+import { ProductAdmin } from './product';
 import { UserProfile } from './auth'
 // --- Tipos para Pedidos (Cliente Final) ---
 export interface OrderItem {
@@ -6,7 +6,7 @@ export interface OrderItem {
   product_id: number;
   quantity: number;
   price_at_purchase: number;
-  product?: Product; // Se o backend expandir ou se fizermos fetch extra
+  product?: ProductAdmin; // Se o backend expandir ou se fizermos fetch extra
 }
 
 export interface Order {
@@ -21,7 +21,7 @@ export interface Order {
 export interface SalesCaseItem {
   product_id: number;
   quantity: number;
-  product?: Product;
+  product?: ProductAdmin;
   // O backend pode retornar detalhes do produto aqui se usarmos expand, 
   // mas o schema básico SalesCaseItemResponse tem apenas ids. 
   // O ideal seria o backend retornar o nome, mas buscaremos produtos se necessário.

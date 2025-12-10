@@ -31,7 +31,7 @@ function SearchContent() {
   // 2. BUSCAR DADOS: React Query dispara sempre que 'filters' muda
   const { data: products, isLoading, isError } = useQuery({
     queryKey: ['products-search', filters],
-    queryFn: () => productService.searchProducts(filters),
+    queryFn: () => productService.searchProductsPublic(filters),
     placeholderData: (prev) => prev, // Mantém dados antigos enquanto carrega novos
   });
 

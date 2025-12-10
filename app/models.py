@@ -3,9 +3,9 @@
 import enum
 from sqlalchemy import (
     Column, Integer, String, Boolean, Float, DECIMAL, DateTime, 
-    ForeignKey, Enum
+    ForeignKey, Enum,Text
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship,backref
 from sqlalchemy.sql import func
 
 # Importamos a Base do nosso arquivo database.py
@@ -68,9 +68,13 @@ class Product(Base):
     stock_quantity = Column(Integer, nullable=False, default=0) # Stock físico total
     on_loan_quantity = Column(Integer, nullable=False, default=0) # Stock em estojos
     
+    cod_cat = Column(String(20), index=True, nullable=True)
+    
+    supplier_ref = Column(String(100), index=True, nullable=True)
+
     barcode = Column(String(100), unique=True, index=True)
     image_url = Column(String(1024))
-    
+    supplier_ref = Column(String(50), nullable=True)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     # Relações
     category = relationship("Category", back_populates="products")
@@ -140,6 +144,10 @@ class Category(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), unique=True, index=True, nullable=False)
     slug = Column(String(100), unique=True, index=True, nullable=False)
+
+    description = Column(String(100), nullable=True)
+    parent_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
+    children = relationship("Category", backref=backref("parent", remote_side=[id]))
     products = relationship("Product", back_populates="category")
 
 class OrderItem(Base):
