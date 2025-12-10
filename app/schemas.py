@@ -259,6 +259,10 @@ class DiscountUpdate(BaseModel):
     discount_price: Optional[Decimal] = None
     end_time: Optional[datetime] = None
 
+class AdminProductSearch(BaseModel):
+    search_term: Optional[str] = None
+    category_id: Optional[int] = None
+
 class ProductFilter(BaseModel):
     min_price: Optional[float] = None
     max_price: Optional[float] = None

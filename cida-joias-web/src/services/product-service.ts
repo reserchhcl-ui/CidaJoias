@@ -72,6 +72,15 @@ export const productService = {
     return response.data;
   },
 
+  searchProductsAdmin: async (term: string): Promise<ProductAdmin[]> => {
+    // Montamos o filtro. Se quiser filtrar categoria também, adicione aqui.
+    const filters = { search_term: term };
+    
+    // IMPORTANTE: Usar ADMIN_URI para receber cost_price e supplier_ref
+    const response = await api.post<ProductAdmin[]>(`${ADMIN_URI}/search`, filters);
+    return response.data;
+  },
+
   // Categorias (Admin cria/deleta)
   createCategory: async (data: any): Promise<Category> => {
       const response = await api.post<Category>('/categories/', data);

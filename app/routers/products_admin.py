@@ -8,7 +8,7 @@ from ..services.pricing_engine import PricingEngine
 from ..services.storage_service import storage
 from .. import models, schemas, auth, crud
 from ..database import get_db
-
+from sqlalchemy import or_
 # Router Administrativo
 router = APIRouter(
     prefix="/backoffice/products",
@@ -179,3 +179,54 @@ def read_product_by_barcode_internal(
     p_data = db_product.__dict__.copy()
     p_data["current_price"] = pricing_engine.get_current_price_for_product(product=db_product)
     return p_data
+
+@router.post("/search", response_model=List[schemas.Product])
+def search_products_admin(
+    filters: schemas.AdminProductSearch,
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(auth.require_admin_user),
+    pricing_engine: PricingEngine = Depends(get_pricing_engine) # <--- Injetar Engine
+):
+    """
+    Busca produtos com dados completos (Admin).
+    """
+    query = db.query(models.Product)
+
+    if filters.search_term:
+        search = f"%{filters.search_term}%"
+        query = query.filter(
+            or_(
+                models.Product.name.ilike(search),
+                models.Product.barcode.ilike(search),
+                models.Product.supplier_ref.ilike(search),
+                models.Product.cod_cat.ilike(search)
+            )
+        )
+    
+    if filters.category_id:
+        query = query.filter(models.Product.category_id == filters.category_id)
+
+    # 1. Busca os dados brutos
+    products_from_db = query.order_by(models.Product.id.desc()).limit(50).all()
+
+    # 2. Calcula os preços (Injection)
+    # Mesmo sendo admin, o schema 'Product' herda de 'ProductPublic' e exige 'current_price'
+    current_prices = pricing_engine.get_current_prices_for_products(products=products_from_db)
+    
+    # 3. Monta a resposta
+    results = []
+    for product in products_from_db:
+        # Copia os dados do modelo para um dicionário
+        p_data = product.__dict__.copy()
+        
+        # Injeta o preço calculado
+        p_data["current_price"] = current_prices.get(product.id, product.selling_price)
+        
+        # Garante que a categoria esteja presente se carregada (para o frontend mostrar nome)
+        if product.category:
+            p_data["category"] = product.category
+            
+        results.append(p_data)
+        
+    return results
+
