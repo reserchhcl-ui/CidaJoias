@@ -1,16 +1,28 @@
 # app/main.py
 
+import os
 from fastapi import FastAPI,APIRouter,Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from .core.config import settings
-from .routers import products, products_admin,users, orders, sales_cases, discounts, recommendations, categories, coupons, addresses ,shipping, payments
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
-from . import auth, crud, schemas, security, database
-import os
 
+from .core.config import settings
+from . import auth, crud, schemas, security, database
+from .routers import (products, 
+                      products_admin,
+                      users, 
+                      orders,
+                      orders_admin, 
+                      sales_cases, 
+                      discounts, 
+                      recommendations, 
+                      categories, 
+                      coupons, 
+                      addresses ,
+                      shipping, 
+                      payments)
 
 app = FastAPI(
     title="Cida Joias API",
@@ -76,6 +88,7 @@ app.mount("/static", StaticFiles(directory=settings.UPLOAD_DIR), name="static")
 api_router.include_router(users.router)
 api_router.include_router(products.router)
 api_router.include_router(products_admin.router)
+api_router.include_router(orders_admin.router)
 api_router.include_router(categories.router)
 api_router.include_router(orders.router)
 api_router.include_router(sales_cases.router)

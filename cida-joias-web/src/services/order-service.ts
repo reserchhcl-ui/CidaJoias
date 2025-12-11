@@ -1,26 +1,42 @@
+// src/services/order-service.ts
 import api from '@/lib/api';
-import { Order } from '@/types/dashboard'; // Reutilizando tipo Order
+import { Order, OrderFilter, OrderStatus } from '@/types/order';
 
-// Status possíveis do pedido
-export type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
+const PUBLIC_URI = '/orders';
+const BACKOFFICE_URI = '/backoffice/orders';
 
 export const orderService = {
-  // Admin: Listar todos os pedidos
-  getAllOrders: async (): Promise<Order[]> => {
-    const response = await api.get<Order[]>('/orders/');
+  // --- ÁREA DO CLIENTE (LOJA) ---
+
+  // Listar meus pedidos
+  getMyOrders: async (): Promise<Order[]> => {
+    const response = await api.get<Order[]>(`${PUBLIC_URI}/meus-pedidos`);
     return response.data;
   },
 
-  // Admin: Detalhes do pedido
+  // Detalhes do pedido (Cliente)
   getOrderById: async (id: number): Promise<Order> => {
-    const response = await api.get<Order>(`/orders/${id}`);
+    const response = await api.get<Order>(`${PUBLIC_URI}/${id}`);
     return response.data;
   },
 
-  // Admin: Atualizar Status
-  updateStatus: async (id: number, status: OrderStatus): Promise<Order> => {
-    // O endpoint é PATCH /orders/{id}/status?new_status=...
-    const response = await api.patch<Order>(`/orders/${id}/status?new_status=${status}`);
+  // --- ÁREA DO ADMIN (BACKOFFICE) ---
+
+  // Busca Avançada (Filtros)
+  searchOrdersAdmin: async (filters: OrderFilter): Promise<Order[]> => {
+    const response = await api.post<Order[]>(`${BACKOFFICE_URI}/search`, filters);
     return response.data;
-  }
+  },
+
+  // Pegar detalhes (Admin - pode ver mais dados internos se houver)
+  getOrderAdminById: async (id: number): Promise<Order> => {
+    const response = await api.get<Order>(`${BACKOFFICE_URI}/${id}`);
+    return response.data;
+  },
+
+  // Atualizar Status
+  updateOrderStatus: async (id: number, status: OrderStatus): Promise<Order> => {
+    const response = await api.put<Order>(`${BACKOFFICE_URI}/${id}`, { status });
+    return response.data;
+  },
 };

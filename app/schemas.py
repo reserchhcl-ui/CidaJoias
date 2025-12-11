@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field, ConfigDict,field_validator,model_validato
 from typing import List,Optional
 from datetime import datetime
 from decimal import Decimal
-from .models import UserRole, CouponType
+from .models import UserRole, CouponType,PaymentStatus
 
 # --- Schemas de Categoria ---
 class CategoryBase(BaseModel):
@@ -31,7 +31,6 @@ class ProductBase(BaseModel):
     image_url: str | None = None
     category_id: int | None = None
     cod_cat: str | None = None
-
 
 class ProductPublic(ProductBase):
     """
@@ -81,7 +80,7 @@ class UserBase(BaseModel):
     full_name: Optional[str] = Field(None, min_length=2, max_length=150)
     phone_number: Optional[str] = Field(None, min_length=10, max_length=20)
     instagram_handle: Optional[str] = None
-    
+
 # Schema para criar um usuário (pede uma senha)
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8, max_length=999)
@@ -118,8 +117,8 @@ class UserUpdate(BaseModel):
     instagram_handle: Optional[str] = None
     role: Optional[UserRole] = None
     is_active: Optional[bool] = None
-# --- Schemas de Autenticação ---
 
+# --- Schemas de Autenticação ---
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -160,6 +159,18 @@ class OrderResponse(BaseModel):
     payment_status: Optional[str] = "pending" 
     model_config = ConfigDict(from_attributes=True)
 
+class OrderFilter(BaseModel):
+    status: Optional[str] = None
+    payment_status: Optional[PaymentStatus] = None
+    user_email: Optional[str] = None # Buscar por cliente
+    date_start: Optional[datetime] = None
+    date_end: Optional[datetime] = None
+
+class OrderUpdate(BaseModel):
+    status: Optional[str] = None # Ex: "shipped", "delivered", "canceled"
+    payment_status: Optional[PaymentStatus] = None
+    transaction_id: Optional[str] = None
+    # Futuro: tracking_code: Optional[str] = None
 
 class SalesCaseItemResponse(BaseModel):
     product_id: int
@@ -369,3 +380,19 @@ class PaymentResponse(BaseModel):
     status: str # approved, failed
     transaction_id: str
     message: str
+
+class PixRequest(BaseModel):
+    order_id: int
+
+class PixResponse(BaseModel):
+    order_id: int
+    status: str # "pending"
+    qr_code: str # O código "Copia e Cola"
+    qr_code_url: Optional[str] = None # URL para imagem do QR (opcional)
+    expires_at: datetime
+    message: str
+
+# Schema para simular o Webhook do banco (Aprovação)
+class PixWebhookMock(BaseModel):
+    order_id: int
+    action: str = "pay" # pay, expire

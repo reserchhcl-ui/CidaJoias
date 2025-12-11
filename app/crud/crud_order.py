@@ -2,14 +2,58 @@
 
 from sqlalchemy.orm import Session, joinedload
 from decimal import Decimal
-from typing import List
-
+from typing import List, Optional
+from sqlalchemy import and_, desc
 from .base import CRUDBase
 from .. import models, schemas
 
 # Note: Como Order não tem Update schema por enquanto, usamos OrderCreate ou BaseModel no Generic
 class CRUDOrder(CRUDBase[models.Order, schemas.OrderCreate, schemas.OrderCreate]):
     
+    def get_multi_filtered(
+        self, 
+        db: Session, 
+        *, 
+        filter_params: schemas.OrderFilter,
+        skip: int = 0, 
+        limit: int = 100
+    ) -> List[models.Order]:
+        """
+        Busca avançada para o Backoffice (Admin).
+        Permite filtrar por status, cliente, data, etc.
+        """
+        query = db.query(self.model)
+
+        # Joins necessários para filtros (ex: email do usuário)
+        if filter_params.user_email:
+            query = query.join(models.User).filter(models.User.email.ilike(f"%{filter_params.user_email}%"))
+
+        # Filtros diretos
+        if filter_params.status:
+            query = query.filter(self.model.status == filter_params.status)
+        
+        if filter_params.payment_status:
+            query = query.filter(self.model.payment_status == filter_params.payment_status)
+            
+        if filter_params.date_start:
+            query = query.filter(self.model.created_at >= filter_params.date_start)
+            
+        if filter_params.date_end:
+            query = query.filter(self.model.created_at <= filter_params.date_end)
+
+        # Ordenação e Eager Loading (Trazer itens e dono junto)
+        return (
+            query
+            .options(
+                joinedload(self.model.items).joinedload(models.OrderItem.product),
+                joinedload(self.model.owner)
+            )
+            .order_by(desc(self.model.created_at)) # Mais recentes primeiro
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
     def create_order_in_db(self, db: Session, *, user: models.User, order_create: schemas.OrderCreate) -> models.Order:
         """
         Esta função antiga era usada diretamente pelo Router simples.

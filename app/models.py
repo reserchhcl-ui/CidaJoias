@@ -29,7 +29,7 @@ class CouponType(str, enum.Enum):
     FIXED = "fixed"           # Ex: R$ 10.00
 
 class PaymentStatus(str, enum.Enum):
-    PENDING = "pending"
+    PENDING = "pending_pay"
     APPROVED = "approved"
     FAILED = "failed"
     REFUNDED = "refunded"
@@ -69,7 +69,7 @@ class Product(Base):
     on_loan_quantity = Column(Integer, nullable=False, default=0) # Stock em estojos
     
     cod_cat = Column(String(20), index=True, nullable=True)
-    
+
     supplier_ref = Column(String(100), index=True, nullable=True)
 
     barcode = Column(String(100), unique=True, index=True)
@@ -104,7 +104,7 @@ class Order(Base):
         Enum(PaymentStatus, name="paymentstatus"), 
         default=PaymentStatus.PENDING, 
         nullable=False,
-        server_default="pending"
+        server_default="pending_pay"
     )
     payment_method = Column(String(50), nullable=True) # credit_card, pix
     transaction_id = Column(String(100), nullable=True) # ID externo do gateway
