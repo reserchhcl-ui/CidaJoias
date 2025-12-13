@@ -6,7 +6,7 @@ from decimal import Decimal
 from datetime import datetime, timezone
 from .. import models, schemas, crud
 from .pricing_engine import PricingEngine
-
+from ..models import OrderStatus, PaymentStatus
 class OrderCreationError(ValueError):
     pass
 
@@ -62,72 +62,89 @@ class OrderService:
         Orquestra a criação de uma nova encomenda com suporte a CUPONS.
         """
         try:
-            # 1. Preparação e validação de estoque
-            products_to_process = []
-            calculated_subtotal = Decimal(0)
+                # 1. Validações Básicas
+            if not checkout_request.items:
+                raise HTTPException(status_code=400, detail="Carrinho vazio")
 
-            for item in checkout_request.items:
-                # Lock pessimista no produto
-                product = crud.product.get_for_update(self.db, product_id=item.product_id)
+            # 2. Loop de Cálculo e Preparação dos Itens
+            # Não salvamos nada no banco ainda. Apenas calculamos na memória.
+            subtotal = Decimal(0)
+            items_to_save = [] # Lista temporária
+
+            for item_req in checkout_request.items:
+                product = crud.product.get(self.db, id=item_req.product_id)
                 if not product:
-                    raise ValueError(f"Produto {item.product_id} não encontrado.")
+                    raise HTTPException(status_code=404, detail=f"Produto {item_req.product_id} não encontrado")
+                
+                # Converter preços para Decimal para evitar erro de float
+                price = Decimal(product.selling_price)
+                qty = Decimal(item_req.quantity)
+                
+                line_total = price * qty
+                subtotal += line_total
 
-                available = product.stock_quantity - product.on_loan_quantity
-                if item.quantity > available:
-                    raise ValueError(f"Estoque insuficiente para '{product.name}'.")
-                
-                # Preço unitário atual (com promoções de produto, se houver)
-                unit_price = self.pricing_engine.get_current_price_for_product(product=product)
-                line_total = unit_price * item.quantity
-                calculated_subtotal += line_total
-                
-                products_to_process.append({
-                    "product": product,
-                    "quantity": item.quantity,
-                    "price": unit_price
+                print(f"Produto: {product.name} | Qtd: {qty} | Preço: {price} | Total Linha: {line_total}")
+
+                # Guardamos os dados para criar o OrderItem depois
+                items_to_save.append({
+                    "product_id": product.id,
+                    "quantity": item_req.quantity,
+                    "price": price
                 })
 
-            # 2. Processamento do Cupom (Se houver)
-            applied_coupon = None
-            discount_amount = Decimal(0)
+            # 3. Cálculo Final
+            shipping = Decimal(checkout_request.shipping_cost)
+            discount = Decimal(0) # Implementar lógica de cupom depois
+            total_amount = subtotal + shipping - discount
 
-            if checkout_request.coupon_code:
-                applied_coupon, discount_amount = self._validate_and_apply_coupon(
-                    checkout_request.coupon_code, 
-                    calculated_subtotal
-                )
-
-            final_total = calculated_subtotal - discount_amount
-
-            # 3. Criação do Pedido (Agora com os valores calculados)
+            # 4. Criar o Pedido (Cabeçalho)
             db_order = models.Order(
                 user_id=user.id,
-                status="processing",
-                subtotal=calculated_subtotal,
-                applied_discount=discount_amount,
-                total_amount=final_total,
-                coupon_id=applied_coupon.id if applied_coupon else None
+                status=OrderStatus.PENDING,
+                payment_status=PaymentStatus.PENDING,
+                
+                subtotal=subtotal,
+                applied_discount=discount,
+                total_amount=total_amount,
+                
+                # --- ADICIONE ESTAS DUAS LINHAS ---
+                shipping_cost=shipping,  # Salva os 20.00 (ou o valor que vier)
+                shipping_address_id=checkout_request.shipping_address_id # Salva o ID 4 para vincular o endereço
+                # ----------------------------------
             )
+
             self.db.add(db_order)
-            self.db.flush() # Gera o ID do pedido
+            self.db.flush()
+            print(f"Pedido criado com ID: {db_order.id}")
 
-            # 4. Criação dos Itens e Baixa de Estoque
-            for p_data in products_to_process:
-                crud.order.create_order_item(
-                    self.db,
-                    order_id=db_order.id,
-                    product_id=p_data["product"].id,
-                    quantity=p_data["quantity"],
-                    price_at_purchase=p_data["price"]
+            # 5. Salvar os Itens (Linhas)
+            for item_data in items_to_save:
+                db_item = models.OrderItem(
+                    order_id=db_order.id, # Linkamos com o ID gerado acima
+                    product_id=item_data["product_id"],
+                    quantity=item_data["quantity"],
+                    price_at_purchase=item_data["price"]
                 )
-                crud.product.decrease_stock(self.db, product=p_data["product"], quantity=p_data["quantity"])
+                self.db.add(db_item)
 
-            # 5. Incrementar uso do cupom (Se usado)
-            if applied_coupon:
-                crud.coupon.increment_usage(self.db, coupon_id=applied_coupon.id)
+            # 6. Commit Final (Grava tudo no banco de verdade)
+            try:
+                self.db.commit()
+            except Exception as e:
+                self.db.rollback()
+                print(f"Erro ao commitar: {e}")
+                raise HTTPException(status_code=500, detail="Erro ao salvar pedido no banco")
 
-            self.db.commit()
+            # 7. Refresh para garantir o retorno correto
+            # Isso recarrega o objeto do banco, trazendo os relationships (items) atualizados
             self.db.refresh(db_order)
+            
+            # Hack para forçar o carregamento dos items se o lazy load estiver atrapalhando
+            if not db_order.items:
+                print("Aviso: Itens não carregaram no refresh. Forçando query.")
+                # Isso força o SQLAlchemy a buscar os itens
+                _ = db_order.items 
+
             return db_order
 
         except Exception as e:

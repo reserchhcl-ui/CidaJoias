@@ -16,7 +16,6 @@ class Settings(BaseSettings):
     # --- Identidade da API ---
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "Cida Joias E-commerce"
-
     # --- Segurança (JWT) ---
     SECRET_KEY: str = "troque_isso_em_producao_por_uma_hash_segura"
     ALGORITHM: str = "HS256"

@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query'; // Importante para buscar endereços
-import { Trash2, ArrowRight, Truck, Tag, Loader2, MapPin } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Trash2, ArrowRight, Truck, Tag, Loader2, MapPin, PackageOpen } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -18,26 +18,27 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"; // Componente novo para seleção
-
+} from "@/components/ui/select";
+import { useRouter } from 'next/navigation'; // Adicione
+import { orderService } from '@/services/order-service'; // Adicione
 import { useCartStore } from '@/store/use-cart-store';
-import { useAuthStore } from '@/store/use-auth-store'; // Para saber se está logado
+import { useAuthStore } from '@/store/use-auth-store';
 import { checkoutService } from '@/services/checkout-service';
-import { addressService } from '@/services/address-service'; // Serviço de Endereços
+import { addressService } from '@/services/address-service';
 import { formatPrice, getImageUrl } from '@/lib/utils';
 import { ShippingOption } from '@/types/cart';
 
 export default function CartPage() {
   const cart = useCartStore();
   const { user } = useAuthStore();
-  
+  const router = useRouter();
   const [zipCode, setZipCode] = useState('');
   const [couponCode, setCouponCode] = useState('');
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [isLoadingShipping, setIsLoadingShipping] = useState(false);
   const [isLoadingCoupon, setIsLoadingCoupon] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   // 1. Buscar Endereços do Usuário (Se logado)
   const { data: addresses } = useQuery({
     queryKey: ['my-addresses'],
@@ -52,22 +53,22 @@ export default function CartPage() {
 
   // 2. Auto-selecionar Endereço Padrão ao carregar
   useEffect(() => {
-    if (addresses && addresses.length > 0 && !zipCode) {
+    if (addresses && addresses.length > 0 && !zipCode && !cart.shippingOption) {
       const defaultAddr = addresses.find(a => a.is_default) || addresses[0];
       setZipCode(defaultAddr.zip_code);
-      // Opcional: Já simular o frete automaticamente
-      // handleSimulateShipping(defaultAddr.zip_code); 
+      // Opcional: Calcular frete automaticamente ao carregar
+      handleSimulateShipping(defaultAddr.zip_code); 
     }
-  }, [addresses]); // Roda quando os endereços são carregados
+  }, [addresses]); 
 
   if (!isMounted) return null;
 
-  // Modifiquei para aceitar cep opcional (para chamadas automáticas)
   const handleSimulateShipping = async (cepToUse?: string) => {
     const code = cepToUse || zipCode;
     
+    // Validação básica de CEP
     if (code.replace(/\D/g, '').length < 8) {
-      toast.error("CEP inválido");
+      toast.error("CEP inválido. Digite 8 números.");
       return;
     }
     
@@ -76,18 +77,20 @@ export default function CartPage() {
       const options = await checkoutService.simulateShipping(code, cart.items);
       setShippingOptions(options);
       
+      // Lógica inteligente de seleção
       if (options.length > 0) {
-         // Se já tinha uma opção selecionada, tenta manter, senão pega a primeira
+         // Tenta manter a opção atual se ela ainda existir na nova lista
          const currentSelected = cart.shippingOption;
-         const stillExists = options.find(o => o.name === currentSelected?.name);
+         const stillExists = currentSelected && options.find(o => o.name === currentSelected.name);
          
-         if (!currentSelected || !stillExists) {
-            cart.setShipping(options[0]);
+         if (!stillExists) {
+            cart.setShipping(options[0]); // Seleciona a primeira (geralmente a mais barata) por padrão
          }
       }
     } catch (error) {
-      toast.error("Erro ao calcular frete.");
+      toast.error("Erro ao calcular frete. Verifique o CEP.");
       setShippingOptions([]);
+      cart.setShipping(null);
     } finally {
       setIsLoadingShipping(false);
     }
@@ -107,8 +110,7 @@ export default function CartPage() {
       setIsLoadingCoupon(false);
     }
   };
-
-  // Handler para quando o usuário escolhe um endereço na lista
+  
   const handleAddressSelect = (addressId: string) => {
     if (addressId === 'manual') {
       setZipCode('');
@@ -123,69 +125,131 @@ export default function CartPage() {
       handleSimulateShipping(selected.zip_code);
       toast.info(`Endereço "${selected.name}" selecionado.`);
     }
+    
+  };
+  const handleCheckout = async () => {
+    if (!cart.shippingOption) {
+      toast.error("Selecione uma opção de frete.");
+      return;
+    }
+    
+    // Pega o ID do endereço selecionado (exemplo simplificado baseando-se no zipCode ou state)
+    // O ideal é ter o addressId salvo num state separado quando o usuário seleciona no Select
+    // Vamos assumir que você salvou em um state 'selectedAddressId'
+    const addressId = addresses?.find(a => a.zip_code === zipCode)?.id;
+    const selectedAddress = addresses?.find(a => a.zip_code === zipCode);
+    if (!addressId && zipCode) {
+      // Caso seja CEP manual sem login, precisaria de fluxo de guest, mas vamos focar no logado
+      toast.error("Por favor, selecione um endereço salvo para continuar.");
+      return;
+    }
+    if (!selectedAddress) {
+      toast.error("Endereço inválido ou não encontrado na sua lista.");
+      return;
+  }
+    
+    setIsCreatingOrder(true);
+    try {
+      // 1. Cria o pedido no Backend
+      const order = await orderService.createOrder(
+          cart.items, 
+          Number(addressId), 
+          cart.shippingOption.price
+      );
+      
+      // 2. Limpa o carrinho (opcional, ou limpa só após pagamento sucesso)
+      // cart.clearCart(); 
+
+      // 3. Redireciona para o Checkout com o ID REAL
+      router.push(`/checkout?orderId=${order.id}`);
+      
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || "Erro ao criar pedido.");
+    } finally {
+      setIsCreatingOrder(false);
+    }
+    
   };
 
   const subtotal = cart.getSubtotal();
   const total = cart.getTotal();
-  const discountAmount = subtotal + (cart.shippingOption?.price || 0) - total;
+  
+  // Cálculo visual do desconto para exibição
+  const shippingCost = cart.shippingOption?.price || 0;
+  // Total = (Subtotal - Desconto) + Frete
+  // Logo: Desconto = Subtotal + Frete - Total
+  const discountAmount = (subtotal + shippingCost) - total;
 
   return (
     <div className="min-h-screen bg-gray-50 py-10">
-      <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold mb-8">Meu Carrinho</h1>
+      <div className="container mx-auto px-4 max-w-6xl">
+        <h1 className="text-3xl font-bold mb-8 text-slate-800">Meu Carrinho</h1>
 
         {cart.items.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-lg shadow">
-            <h2 className="text-2xl font-semibold mb-4">Seu carrinho está vazio</h2>
+          <div className="text-center py-20 bg-white rounded-lg shadow-sm border border-slate-100 flex flex-col items-center">
+            <PackageOpen className="h-16 w-16 text-slate-300 mb-4" />
+            <h2 className="text-2xl font-semibold mb-2 text-slate-700">Seu carrinho está vazio</h2>
+            <p className="text-slate-500 mb-6">Parece que você ainda não adicionou nenhum item.</p>
             <Link href="/">
-              <Button>Ir as compras</Button>
+              <Button size="lg">Ir às compras</Button>
             </Link>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
-            {/* Lista de Itens */}
+            {/* --- LISTA DE PRODUTOS --- */}
             <div className="lg:col-span-2 space-y-4">
-              <Card>
-                <CardHeader>
+              <Card className="border-slate-200 shadow-sm">
+                <CardHeader className="pb-4">
                   <CardTitle>Produtos ({cart.items.length})</CardTitle>
                 </CardHeader>
-                <CardContent className="divide-y">
+                <CardContent className="divide-y divide-slate-100">
                   {cart.items.map((item) => (
-                    <div key={item.id} className="flex py-6 gap-4">
-                       <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-md border bg-gray-100">
-                        <img
-                            src={getImageUrl(item.image_url)}
-                            alt={item.name}
-                            className="h-full w-full object-cover"
-                        />
+                    <div key={item.id} className="flex py-6 gap-4 md:gap-6 animate-in fade-in">
+                       {/* Imagem */}
+                       <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-md border bg-gray-50">
+                        {item.image_url ? (
+                            <img
+                                src={getImageUrl(item.image_url)}
+                                alt={item.name}
+                                className="h-full w-full object-cover"
+                            />
+                        ) : (
+                            <div className="h-full w-full flex items-center justify-center text-slate-300"><PackageOpen /></div>
+                        )}
                        </div>
+                       
+                       {/* Detalhes */}
                        <div className="flex flex-1 flex-col justify-between">
-                         <div className="flex justify-between">
+                         <div className="flex justify-between items-start">
                             <div>
-                                <h3 className="font-medium">{item.name}</h3>
-                                <p className="text-sm text-gray-500">{item.category?.name}</p>
+                                <h3 className="font-semibold text-slate-900 line-clamp-2">{item.name}</h3>
+                                <p className="text-sm text-slate-500 mt-1">{item.category?.name}</p>
                             </div>
-                            <p className="font-bold text-lg">
+                            <p className="font-bold text-lg text-slate-900">
                                 {formatPrice((item.current_price || item.selling_price) * item.quantity)}
                             </p>
                          </div>
                          
                          <div className="flex justify-between items-center mt-4">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-3">
                                 <span className="text-sm text-gray-600">Qtd:</span>
                                 <Input 
                                     type="number" 
-                                    className="w-16 h-8" 
+                                    className="w-16 h-8 text-center" 
                                     min={1} 
                                     max={item.stock_quantity}
                                     value={item.quantity}
-                                    onChange={(e) => cart.updateQuantity(item.id, Number(e.target.value))}
+                                    onChange={(e) => {
+                                        const val = Number(e.target.value);
+                                        if (val > 0) cart.updateQuantity(item.id, val);
+                                    }}
                                 />
                             </div>
                             <Button 
                                 variant="ghost" 
-                                className="text-red-500 hover:text-red-700"
+                                size="sm"
+                                className="text-slate-400 hover:text-red-600 hover:bg-red-50"
                                 onClick={() => cart.removeItem(item.id)}
                             >
                                 <Trash2 className="h-4 w-4 mr-2" /> Remover
@@ -198,60 +262,60 @@ export default function CartPage() {
               </Card>
             </div>
 
-            {/* Resumo e Frete */}
+            {/* --- RESUMO E CHECKOUT --- */}
             <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Resumo do Pedido</CardTitle>
+              <Card className="border-slate-200 shadow-lg sticky top-24">
+                <CardHeader className="bg-slate-50 border-b border-slate-100">
+                  <CardTitle className="text-lg">Resumo do Pedido</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-6 pt-6">
                   
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Subtotal</span>
-                    <span className="font-medium">{formatPrice(subtotal)}</span>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Subtotal</span>
+                    <span className="font-medium text-slate-900">{formatPrice(subtotal)}</span>
                   </div>
 
                   <Separator />
 
                   {/* FRETE INTELIGENTE */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                        <Truck className="h-4 w-4 text-gray-500" />
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-slate-700">
+                        <Truck className="h-4 w-4" />
                         <span className="font-medium text-sm">Entrega</span>
                     </div>
 
-                    {/* Seletor de Endereços (Apenas se logado e com endereços) */}
+                    {/* Seletor de Endereços Salvos */}
                     {user && addresses && addresses.length > 0 && (
-                      <div className="mb-3">
-                        <Select onValueChange={handleAddressSelect} defaultValue={addresses.find(a => a.is_default)?.id.toString()}>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Selecione um endereço" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="manual">Digitar outro CEP...</SelectItem>
-                            {addresses.map((addr) => (
-                              <SelectItem key={addr.id} value={addr.id.toString()}>
-                                {addr.name} ({addr.street}, {addr.number})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      <Select onValueChange={handleAddressSelect} defaultValue={addresses.find(a => a.is_default)?.id.toString()}>
+                        <SelectTrigger className="w-full bg-white">
+                          <SelectValue placeholder="Selecione um endereço" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="manual">Outro CEP...</SelectItem>
+                          {addresses.map((addr) => (
+                            <SelectItem key={addr.id} value={addr.id.toString()}>
+                              {addr.name} - {addr.street}, {addr.number}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     )}
 
+                    {/* Input de CEP */}
                     <div className="flex gap-2">
                         <Input 
-                            placeholder="CEP (00000-000)" 
+                            placeholder="00000-000" 
                             value={zipCode}
                             onChange={(e) => setZipCode(e.target.value)}
                             maxLength={9}
-                            // Se selecionou endereço salvo, pode deixar readonly para evitar confusão ou liberar
+                            className="bg-white"
                         />
                         <Button variant="outline" onClick={() => handleSimulateShipping()} disabled={isLoadingShipping}>
                             {isLoadingShipping ? <Loader2 className="h-4 w-4 animate-spin" /> : "Calcular"}
                         </Button>
                     </div>
 
+                    {/* Opções de Frete */}
                     {shippingOptions.length > 0 && (
                         <RadioGroup 
                             value={cart.shippingOption?.name} 
@@ -259,13 +323,17 @@ export default function CartPage() {
                                 const opt = shippingOptions.find(o => o.name === val);
                                 if (opt) cart.setShipping(opt);
                             }}
-                            className="mt-2"
+                            className="mt-2 space-y-2"
                         >
                             {shippingOptions.map((opt) => (
-                                <div key={opt.name} className="flex items-center space-x-2 border p-3 rounded-md cursor-pointer hover:bg-gray-50">
+                                <div 
+                                    key={opt.name} 
+                                    className={`flex items-center space-x-2 border p-3 rounded-md cursor-pointer transition-colors ${cart.shippingOption?.name === opt.name ? 'border-blue-500 bg-blue-50' : 'hover:bg-slate-50 border-slate-200'}`}
+                                    onClick={() => cart.setShipping(opt)}
+                                >
                                     <RadioGroupItem value={opt.name} id={opt.name} />
-                                    <Label htmlFor={opt.name} className="flex-1 flex justify-between cursor-pointer text-sm">
-                                        <span>{opt.name} ({opt.estimated_days} dias)</span>
+                                    <Label htmlFor={opt.name} className="flex-1 flex justify-between cursor-pointer text-sm font-normal">
+                                        <span className="text-slate-700">{opt.name} <span className="text-xs text-slate-500">({opt.estimated_days} dias)</span></span>
                                         <span className="font-bold text-green-700">
                                             {opt.price === 0 ? 'Grátis' : formatPrice(opt.price)}
                                         </span>
@@ -278,10 +346,10 @@ export default function CartPage() {
 
                   <Separator />
 
-                  {/* Cupom */}
+                  {/* CUPOM */}
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                        <Tag className="h-4 w-4 text-gray-500" />
+                    <div className="flex items-center gap-2 text-slate-700">
+                        <Tag className="h-4 w-4" />
                         <span className="font-medium text-sm">Cupom de Desconto</span>
                     </div>
                     <div className="flex gap-2">
@@ -289,55 +357,68 @@ export default function CartPage() {
                             placeholder="Código" 
                             value={couponCode}
                             onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                            className="uppercase bg-white"
                         />
                         <Button variant="outline" onClick={handleApplyCoupon} disabled={isLoadingCoupon}>
                              {isLoadingCoupon ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aplicar"}
                         </Button>
                     </div>
                     {cart.appliedCoupon && (
-                        <div className="text-sm text-green-600 bg-green-50 p-2 rounded flex justify-between">
-                            <span>Cupom aplicado: {cart.appliedCoupon.code}</span>
-                            <button onClick={() => cart.setCoupon(null)} className="text-xs underline">Remover</button>
+                        <div className="text-sm text-green-700 bg-green-100 border border-green-200 p-2 rounded flex justify-between items-center animate-in fade-in">
+                            <span>Cupom <b>{cart.appliedCoupon.code}</b> aplicado!</span>
+                            <button onClick={() => cart.setCoupon(null)} className="text-xs underline hover:text-green-900">Remover</button>
                         </div>
                     )}
                   </div>
 
                   <Separator />
 
+                  {/* TOTAIS FINAIS */}
                   <div className="space-y-2">
                      {cart.shippingOption && (
-                        <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Frete</span>
+                        <div className="flex justify-between text-sm animate-in slide-in-from-right-2">
+                            <span className="text-slate-600">Frete</span>
                             <span>{cart.shippingOption.price === 0 ? 'Grátis' : formatPrice(cart.shippingOption.price)}</span>
                         </div>
                      )}
-                     {discountAmount > 0 && (
-                        <div className="flex justify-between text-sm text-green-600">
+                     
+                     {/* Mostra desconto somente se for maior que zero */}
+                     {Math.abs(discountAmount) > 0.01 && (
+                        <div className="flex justify-between text-sm text-green-600 font-medium animate-in slide-in-from-right-2">
                             <span>Descontos</span>
                             <span>- {formatPrice(discountAmount)}</span>
                         </div>
                      )}
-                     <div className="flex justify-between text-xl font-bold mt-2">
+
+                     <div className="flex justify-between text-xl font-bold mt-4 pt-4 border-t border-slate-100">
                         <span>Total</span>
                         <span>{formatPrice(total)}</span>
                      </div>
                   </div>
 
                 </CardContent>
-                <CardFooter>
-                    {/* Botão de Fechar Pedido: Só habilita se frete estiver escolhido */}
-                    <Button className="w-full h-12 text-lg" disabled={!cart.shippingOption}>
-                        Fechar Pedido <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
+                <CardFooter className="pb-6">
+                    {/* Botão de Fechar Pedido */}
+                    <Button 
+                      onClick={handleCheckout} // Mudei aqui
+                      disabled={!cart.shippingOption || isCreatingOrder} // Disable no loading
+                      className="w-full h-12 text-lg shadow-md hover:shadow-lg transition-all" >
+                      {isCreatingOrder ? (
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      ) : (
+                          <ArrowRight className="mr-2 h-5 w-5" />
+                      )}
+                      Ir para Pagamento
+                  </Button>
                 </CardFooter>
               </Card>
               
               {/* Avisos de UX */}
               {!cart.shippingOption && (
-                  <p className="text-xs text-red-500 text-center bg-red-50 p-2 rounded">
-                    <MapPin className="inline h-3 w-3 mr-1" />
-                    Selecione um endereço e calcule o frete para continuar.
-                  </p>
+                  <div className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 p-3 rounded-md">
+                    <MapPin className="h-5 w-5 flex-shrink-0" />
+                    <p>Por favor, selecione ou calcule o frete para prosseguir para o pagamento.</p>
+                  </div>
               )}
             </div>
           </div>

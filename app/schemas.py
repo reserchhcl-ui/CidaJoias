@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field, ConfigDict,field_validator,model_validato
 from typing import List,Optional
 from datetime import datetime
 from decimal import Decimal
-from .models import UserRole, CouponType,PaymentStatus
+from .models import UserRole, CouponType,PaymentStatus,OrderStatus
 
 # --- Schemas de Categoria ---
 class CategoryBase(BaseModel):
@@ -139,35 +139,73 @@ class OrderCreate(BaseModel):
 
 # --- Schemas de Resposta ---
 
+class ProductSummary(BaseModel):
+    id: int
+    name: str
+    image_url: Optional[str] = None
+    # Adicione barcode ou sku se achar necessário
+    
+    model_config = ConfigDict(from_attributes=True)
 # Schema para um item dentro da resposta da API
 class OrderItemResponse(OrderItemBase):
     id: int
-    price_at_purchase: float # Usamos float na API para ser compatível com JSON
+    product_id: int
+    quantity: int
+    price_at_purchase: float # O preço que foi pago na época
+    
+    # --- NOVO CAMPO: O objeto produto aninhado ---
+    product: Optional[ProductSummary] = None
+    # ---------------------------------------------
 
     model_config = ConfigDict(from_attributes=True)
 
+
 # Schema completo para a resposta da API (a encomenda criada)
+
+class AddressResponse(BaseModel):
+    id: int
+    street: str
+    number: str
+    complement: Optional[str] = None
+    neighborhood: str
+    city: str
+    state: str
+    zip_code: str
+    
+    model_config = ConfigDict(from_attributes=True)
+
 class OrderResponse(BaseModel):
     id: int
     user_id: int
-    status: str
-    subtotal: Optional[Decimal] = None
-    applied_discount: Optional[Decimal] = None # Novo
-    total_amount: Optional[Decimal] = None # Novo
-    created_at: datetime | None = None
-    items: List[OrderItemResponse] = [] # (Certifique-se que OrderItemResponse existe)
-    payment_status: Optional[str] = "pending" 
+    status: OrderStatus
+    created_at: Optional[datetime] = None
+    
+    # Valores
+    subtotal: Decimal
+    applied_discount: Decimal = Decimal(0)
+    
+    # --- NOVOS CAMPOS ---
+    shipping_cost: Decimal = Decimal(0) # Custo do Frete
+    total_amount: Decimal
+    
+    payment_status: Optional[PaymentStatus] = None
+    
+    # Relacionamentos
+    items: List[OrderItemResponse] = []
+    shipping_address: Optional[AddressResponse] = None # Objeto aninhado do endereço
+    # --------------------
+
     model_config = ConfigDict(from_attributes=True)
 
 class OrderFilter(BaseModel):
-    status: Optional[str] = None
+    status: Optional[OrderStatus] = None
     payment_status: Optional[PaymentStatus] = None
     user_email: Optional[str] = None # Buscar por cliente
     date_start: Optional[datetime] = None
     date_end: Optional[datetime] = None
 
 class OrderUpdate(BaseModel):
-    status: Optional[str] = None # Ex: "shipped", "delivered", "canceled"
+    status: Optional[OrderStatus] = None
     payment_status: Optional[PaymentStatus] = None
     transaction_id: Optional[str] = None
     # Futuro: tracking_code: Optional[str] = None
@@ -251,6 +289,8 @@ class CheckoutItem(BaseModel):
 class CheckoutRequest(BaseModel):
     items: List[CheckoutItem]
     coupon_code: Optional[str] = None
+    shipping_address_id: int
+    shipping_cost: Decimal = Field(..., ge=0)
 
 class DiscountBase(BaseModel):
     product_id: int

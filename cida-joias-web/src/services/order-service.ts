@@ -10,10 +10,29 @@ export const orderService = {
 
   // Listar meus pedidos
   getMyOrders: async (): Promise<Order[]> => {
-    const response = await api.get<Order[]>(`${PUBLIC_URI}/meus-pedidos`);
+    const response = await api.get<Order[]>(`${PUBLIC_URI}/`); 
     return response.data;
   },
+  // Novo método para criar o pedido vindo do carrinho
+  createOrder: async (cartItems: any[], shippingAddressId: number, shippingCost: number): Promise<{ id: number }> => {
+    
+    // Mapeamento de segurança (Frontend -> Backend)
+    const formattedItems = cartItems.map((item) => ({
+        product_id: item.id,
+        quantity: item.quantity
+    }));
 
+    const payload = {
+        items: formattedItems,
+        shipping_address_id: shippingAddressId,
+        shipping_cost: shippingCost
+    };
+
+    // Chamada atualizada para a raiz '/'
+    const response = await api.post<{ id: number }>(`${PUBLIC_URI}/`, payload);
+    return response.data;
+  },
+  
   // Detalhes do pedido (Cliente)
   getOrderById: async (id: number): Promise<Order> => {
     const response = await api.get<Order>(`${PUBLIC_URI}/${id}`);

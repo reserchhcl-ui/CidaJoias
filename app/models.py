@@ -33,6 +33,14 @@ class PaymentStatus(str, enum.Enum):
     APPROVED = "approved"
     FAILED = "failed"
     REFUNDED = "refunded"
+
+class OrderStatus(str, enum.Enum):
+    PENDING = 'pending'
+    PROCESSING = 'processing'
+    SHIPPED = 'shipped'
+    DELIVERED = 'delivered'
+    CANCELLED = 'cancelled'
+    PAID = 'paid_order' # <--- O valor exato que o Front pediu
 # --- MODELOS ATUALIZADOS E NOVOS ---
 
 class User(Base):
@@ -97,7 +105,7 @@ class Order(Base):
     __tablename__ = "orders"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    status = Column(String(50), nullable=False, default="pending")
+    status = Column(String(50), nullable=False, default=OrderStatus.PENDING)
 
     # --- NOVOS CAMPOS FINANCEIROS ---
     payment_status = Column(
@@ -114,7 +122,14 @@ class Order(Base):
     applied_discount = Column(DECIMAL(10, 2), default=0.0) # Salva o valor monetário abatido (Ex: 15.00) para auditoria
     subtotal = Column(DECIMAL(10, 2), default=0.0) # Salva o subtotal (soma dos itens)
     total_amount = Column(DECIMAL(10, 2), default=0.0) # Salva o total final a pagar (subtotal - desconto)
-
+    shipping_cost = Column(DECIMAL(10, 2), default=0.00)
+    
+    # Foreign Key para o Endereço
+    shipping_address_id = Column(Integer, ForeignKey("addresses.id"), nullable=True)
+    
+    # --- RELACIONAMENTO ---
+    # Isso permite acessar order.shipping_address no Python
+    shipping_address = relationship("Address")
     owner = relationship("User", back_populates="orders")
     items = relationship("OrderItem", back_populates="order")
     coupon = relationship("Coupon", back_populates="orders")
@@ -205,3 +220,10 @@ class Coupon(Base):
 
     # Relação com pedidos
     orders = relationship("Order", back_populates="coupon")
+
+class IdempotencyKey(Base):
+    __tablename__ = "idempotency_keys"
+    
+    key = Column(String(100), primary_key=True, index=True)
+    response_json = Column(Text, nullable=False) # JSON da resposta original
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

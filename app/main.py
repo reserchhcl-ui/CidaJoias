@@ -47,10 +47,10 @@ origins = [
 app.mount("/Produtos_Images", StaticFiles(directory=products_upload_dir), name="product_images")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,        # Permite as origens listadas acima
-    allow_credentials=True,       # Permite cookies e credenciais (importante para Auth)
-    allow_methods=["*"],          # Permite todos os métodos (GET, POST, PUT, DELETE, etc.)
-    allow_headers=["*"],          # Permite todos os headers (Authorization, Content-Type, etc.)
+    allow_origins=origins,        # Lista de origens permitidas
+    allow_credentials=True,       # Permite cookies/headers de autenticação
+    allow_methods=["*"],          # Permite todos os métodos (GET, POST, PUT, DELETE...)
+    allow_headers=["*"],          # Permite todos os headers (Authorization, Content-Type...)
 )
 
 api_router = APIRouter(prefix=settings.API_V1_STR)

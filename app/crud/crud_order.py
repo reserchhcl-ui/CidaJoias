@@ -60,7 +60,7 @@ class CRUDOrder(CRUDBase[models.Order, schemas.OrderCreate, schemas.OrderCreate]
         Mantemos para compatibilidade, mas agora encapsulada.
         """
         # A lógica complexa deve ficar no Service, mas aqui é a persistência bruta
-        db_order = models.Order(user_id=user.id, status="created")
+        db_order = models.Order(user_id=user.id, status="pending")
         db.add(db_order)
         db.commit()
         db.refresh(db_order)
@@ -97,29 +97,35 @@ class CRUDOrder(CRUDBase[models.Order, schemas.OrderCreate, schemas.OrderCreate]
         db.add(db_item)
         return db_item
 
-    def get_orders_by_customer(
-        self, 
-        db: Session, 
-        *, 
-        user_id: int, 
-        skip: int = 0, 
-        limit: int = 100
-    ) -> List[models.Order]:
+    def get_orders_by_customer(self, db: Session, user_id: int, skip: int = 0, limit: int = 100) -> List[models.Order]:
         """
-        Busca o histórico de pedidos de um cliente com Eager Loading (joinedload)
-        para trazer os itens e produtos numa única query.
+        Busca pedidos trazendo: Itens, Produto dos Itens e Endereço de Entrega.
         """
         return (
             db.query(self.model)
             .filter(self.model.user_id == user_id)
-            .order_by(self.model.id.desc())
             .options(
-                joinedload(models.Order.items)
-                .joinedload(models.OrderItem.product)
+                # Carrega os itens e, dentro deles, o produto
+                joinedload(self.model.items).joinedload(models.OrderItem.product),
+                # Carrega o endereço de entrega
+                joinedload(self.model.shipping_address)
             )
+            .order_by(self.model.created_at.desc())
             .offset(skip)
             .limit(limit)
             .all()
+        )
+
+    # Precisamos atualizar o GET unitário também (usado em /orders/{id})
+    def get(self, db: Session, id: int):
+        return (
+            db.query(self.model)
+            .filter(self.model.id == id)
+            .options(
+                joinedload(self.model.items).joinedload(models.OrderItem.product),
+                joinedload(self.model.shipping_address)
+            )
+            .first()
         )
     
     # Alias para manter compatibilidade se algum router chamar 'get_by_user'
