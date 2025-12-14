@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation'; // Importar useRouter
 import { useQuery } from '@tanstack/react-query';
 import { Trash2, ArrowRight, Truck, Tag, Loader2, MapPin, PackageOpen } from 'lucide-react';
 import { toast } from 'sonner';
@@ -19,31 +20,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useRouter } from 'next/navigation'; // Adicione
-import { orderService } from '@/services/order-service'; // Adicione
+
 import { useCartStore } from '@/store/use-cart-store';
 import { useAuthStore } from '@/store/use-auth-store';
 import { checkoutService } from '@/services/checkout-service';
 import { addressService } from '@/services/address-service';
+import { orderService } from '@/services/order-service'; // Importar OrderService
 import { formatPrice, getImageUrl } from '@/lib/utils';
 import { ShippingOption } from '@/types/cart';
 
 export default function CartPage() {
+  const router = useRouter();
   const cart = useCartStore();
   const { user } = useAuthStore();
-  const router = useRouter();
+  
   const [zipCode, setZipCode] = useState('');
   const [couponCode, setCouponCode] = useState('');
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [isLoadingShipping, setIsLoadingShipping] = useState(false);
   const [isLoadingCoupon, setIsLoadingCoupon] = useState(false);
+  const [isCreatingOrder, setIsCreatingOrder] = useState(false); // Estado de loading do pedido
   const [isMounted, setIsMounted] = useState(false);
-  const [isCreatingOrder, setIsCreatingOrder] = useState(false);
-  // 1. Buscar Endereços do Usuário (Se logado)
+
+  // 1. Buscar Endereços
   const { data: addresses } = useQuery({
     queryKey: ['my-addresses'],
     queryFn: addressService.getMyAddresses,
-    enabled: !!user, // Só busca se tiver usuário
+    enabled: !!user,
   });
 
   useEffect(() => {
@@ -51,24 +54,16 @@ export default function CartPage() {
     setIsMounted(true);
   }, []);
 
-  // 2. Auto-selecionar Endereço Padrão ao carregar
-  useEffect(() => {
-    if (addresses && addresses.length > 0 && !zipCode && !cart.shippingOption) {
-      const defaultAddr = addresses.find(a => a.is_default) || addresses[0];
-      setZipCode(defaultAddr.zip_code);
-      // Opcional: Calcular frete automaticamente ao carregar
-      handleSimulateShipping(defaultAddr.zip_code); 
-    }
-  }, [addresses]); 
-
-  if (!isMounted) return null;
-
+  // --- CORREÇÃO: FUNÇÃO MOVIDA PARA CIMA DO USEEFFECT ---
   const handleSimulateShipping = async (cepToUse?: string) => {
     const code = cepToUse || zipCode;
     
-    // Validação básica de CEP
+    // Se carrinho vazio, não calcula
+    if (cart.items.length === 0) return;
+
     if (code.replace(/\D/g, '').length < 8) {
-      toast.error("CEP inválido. Digite 8 números.");
+      // Só avisa erro se for interação manual (não no load automático)
+      if (!cepToUse) toast.error("CEP inválido. Digite 8 números.");
       return;
     }
     
@@ -77,18 +72,16 @@ export default function CartPage() {
       const options = await checkoutService.simulateShipping(code, cart.items);
       setShippingOptions(options);
       
-      // Lógica inteligente de seleção
       if (options.length > 0) {
-         // Tenta manter a opção atual se ela ainda existir na nova lista
          const currentSelected = cart.shippingOption;
          const stillExists = currentSelected && options.find(o => o.name === currentSelected.name);
          
          if (!stillExists) {
-            cart.setShipping(options[0]); // Seleciona a primeira (geralmente a mais barata) por padrão
+            cart.setShipping(options[0]);
          }
       }
     } catch (error) {
-      toast.error("Erro ao calcular frete. Verifique o CEP.");
+      if (!cepToUse) toast.error("Erro ao calcular frete.");
       setShippingOptions([]);
       cart.setShipping(null);
     } finally {
@@ -96,6 +89,17 @@ export default function CartPage() {
     }
   };
 
+  // --- USEEFFECT AGORA PODE ACESSAR A FUNÇÃO ACIMA ---
+  useEffect(() => {
+    // Só tenta calcular se tiver itens no carrinho e endereços carregados
+    if (cart.items.length > 0 && addresses && addresses.length > 0 && !zipCode && !cart.shippingOption) {
+      const defaultAddr = addresses.find(a => a.is_default) || addresses[0];
+      setZipCode(defaultAddr.zip_code);
+      handleSimulateShipping(defaultAddr.zip_code); 
+    }
+  }, [addresses, isMounted]); // Dependências ajustadas
+
+  // Outros Handlers
   const handleApplyCoupon = async () => {
     if (!couponCode) return;
     setIsLoadingCoupon(true);
@@ -110,7 +114,7 @@ export default function CartPage() {
       setIsLoadingCoupon(false);
     }
   };
-  
+
   const handleAddressSelect = (addressId: string) => {
     if (addressId === 'manual') {
       setZipCode('');
@@ -125,59 +129,55 @@ export default function CartPage() {
       handleSimulateShipping(selected.zip_code);
       toast.info(`Endereço "${selected.name}" selecionado.`);
     }
-    
   };
+
   const handleCheckout = async () => {
     if (!cart.shippingOption) {
-      toast.error("Selecione uma opção de frete.");
+      toast.error("Por favor, calcule e selecione o frete antes de continuar.");
       return;
     }
-    
-    // Pega o ID do endereço selecionado (exemplo simplificado baseando-se no zipCode ou state)
-    // O ideal é ter o addressId salvo num state separado quando o usuário seleciona no Select
-    // Vamos assumir que você salvou em um state 'selectedAddressId'
-    const addressId = addresses?.find(a => a.zip_code === zipCode)?.id;
+
     const selectedAddress = addresses?.find(a => a.zip_code === zipCode);
-    if (!addressId && zipCode) {
-      // Caso seja CEP manual sem login, precisaria de fluxo de guest, mas vamos focar no logado
-      toast.error("Por favor, selecione um endereço salvo para continuar.");
-      return;
-    }
-    if (!selectedAddress) {
-      toast.error("Endereço inválido ou não encontrado na sua lista.");
-      return;
-  }
     
+    if (!selectedAddress && zipCode.length >= 8) {
+       // Se o usuário digitou CEP manual mas não tem login/endereço salvo no sistema
+       // Aqui idealmente você forçaria o cadastro de endereço, mas vamos assumir o fluxo logado
+       toast.error("Selecione um endereço cadastrado para entrega.");
+       return;
+    }
+
+    if (!selectedAddress) {
+        toast.error("Endereço inválido.");
+        return;
+    }
+
     setIsCreatingOrder(true);
     try {
-      // 1. Cria o pedido no Backend
       const order = await orderService.createOrder(
           cart.items, 
-          Number(addressId), 
+          selectedAddress.id, 
           cart.shippingOption.price
       );
       
-      // 2. Limpa o carrinho (opcional, ou limpa só após pagamento sucesso)
-      // cart.clearCart(); 
+      // Limpa carrinho pois virou pedido
+      cart.clearCart(); 
 
-      // 3. Redireciona para o Checkout com o ID REAL
       router.push(`/checkout?orderId=${order.id}`);
       
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || "Erro ao criar pedido.");
+      console.error(error);
+      const msg = error.response?.data?.detail || "Erro ao criar pedido.";
+      toast.error(msg);
     } finally {
       setIsCreatingOrder(false);
     }
-    
   };
+
+  if (!isMounted) return null;
 
   const subtotal = cart.getSubtotal();
   const total = cart.getTotal();
-  
-  // Cálculo visual do desconto para exibição
   const shippingCost = cart.shippingOption?.price || 0;
-  // Total = (Subtotal - Desconto) + Frete
-  // Logo: Desconto = Subtotal + Frete - Total
   const discountAmount = (subtotal + shippingCost) - total;
 
   return (
@@ -206,7 +206,6 @@ export default function CartPage() {
                 <CardContent className="divide-y divide-slate-100">
                   {cart.items.map((item) => (
                     <div key={item.id} className="flex py-6 gap-4 md:gap-6 animate-in fade-in">
-                       {/* Imagem */}
                        <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-md border bg-gray-50">
                         {item.image_url ? (
                             <img
@@ -219,7 +218,6 @@ export default function CartPage() {
                         )}
                        </div>
                        
-                       {/* Detalhes */}
                        <div className="flex flex-1 flex-col justify-between">
                          <div className="flex justify-between items-start">
                             <div>
@@ -277,14 +275,12 @@ export default function CartPage() {
 
                   <Separator />
 
-                  {/* FRETE INTELIGENTE */}
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 text-slate-700">
                         <Truck className="h-4 w-4" />
                         <span className="font-medium text-sm">Entrega</span>
                     </div>
 
-                    {/* Seletor de Endereços Salvos */}
                     {user && addresses && addresses.length > 0 && (
                       <Select onValueChange={handleAddressSelect} defaultValue={addresses.find(a => a.is_default)?.id.toString()}>
                         <SelectTrigger className="w-full bg-white">
@@ -301,7 +297,6 @@ export default function CartPage() {
                       </Select>
                     )}
 
-                    {/* Input de CEP */}
                     <div className="flex gap-2">
                         <Input 
                             placeholder="00000-000" 
@@ -315,7 +310,6 @@ export default function CartPage() {
                         </Button>
                     </div>
 
-                    {/* Opções de Frete */}
                     {shippingOptions.length > 0 && (
                         <RadioGroup 
                             value={cart.shippingOption?.name} 
@@ -346,7 +340,6 @@ export default function CartPage() {
 
                   <Separator />
 
-                  {/* CUPOM */}
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-slate-700">
                         <Tag className="h-4 w-4" />
@@ -373,7 +366,6 @@ export default function CartPage() {
 
                   <Separator />
 
-                  {/* TOTAIS FINAIS */}
                   <div className="space-y-2">
                      {cart.shippingOption && (
                         <div className="flex justify-between text-sm animate-in slide-in-from-right-2">
@@ -382,7 +374,6 @@ export default function CartPage() {
                         </div>
                      )}
                      
-                     {/* Mostra desconto somente se for maior que zero */}
                      {Math.abs(discountAmount) > 0.01 && (
                         <div className="flex justify-between text-sm text-green-600 font-medium animate-in slide-in-from-right-2">
                             <span>Descontos</span>
@@ -398,22 +389,21 @@ export default function CartPage() {
 
                 </CardContent>
                 <CardFooter className="pb-6">
-                    {/* Botão de Fechar Pedido */}
                     <Button 
-                      onClick={handleCheckout} // Mudei aqui
-                      disabled={!cart.shippingOption || isCreatingOrder} // Disable no loading
-                      className="w-full h-12 text-lg shadow-md hover:shadow-lg transition-all" >
-                      {isCreatingOrder ? (
-                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      ) : (
-                          <ArrowRight className="mr-2 h-5 w-5" />
-                      )}
-                      Ir para Pagamento
-                  </Button>
+                        onClick={handleCheckout}
+                        disabled={!cart.shippingOption || isCreatingOrder}
+                        className="w-full h-12 text-lg shadow-md hover:shadow-lg transition-all" 
+                    >
+                        {isCreatingOrder ? (
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        ) : (
+                            <ArrowRight className="mr-2 h-5 w-5" />
+                        )}
+                        Ir para Pagamento
+                    </Button>
                 </CardFooter>
               </Card>
               
-              {/* Avisos de UX */}
               {!cart.shippingOption && (
                   <div className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 p-3 rounded-md">
                     <MapPin className="h-5 w-5 flex-shrink-0" />

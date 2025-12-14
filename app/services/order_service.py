@@ -83,8 +83,6 @@ class OrderService:
                 line_total = price * qty
                 subtotal += line_total
 
-                print(f"Produto: {product.name} | Qtd: {qty} | Preço: {price} | Total Linha: {line_total}")
-
                 # Guardamos os dados para criar o OrderItem depois
                 items_to_save.append({
                     "product_id": product.id,
@@ -115,7 +113,6 @@ class OrderService:
 
             self.db.add(db_order)
             self.db.flush()
-            print(f"Pedido criado com ID: {db_order.id}")
 
             # 5. Salvar os Itens (Linhas)
             for item_data in items_to_save:

@@ -1,48 +1,70 @@
-# NOVO ARQUIVO: app/services/email_service.py
+# app/services/email_service.py
 
-import logging
-from .. import models
-
-# Configuração básica de log para simular o envio
-logger = logging.getLogger("uvicorn")
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from ..core.config import settings
+from ..models import Order, User, OrderStatus
 
 class EmailService:
-    def __init__(self):
-        self.sender = "noreply@cidajoias.com"
+    
+    def _send_email_sync(self, to_email: str, subject: str, html_content: str):
+        """Lógica interna de envio SMTP."""
+        if not settings.EMAILS_ENABLED:
+            print(f"--- [MOCK EMAIL] Para: {to_email} | Assunto: {subject} ---")
+            return
 
-    def send_email(self, to: str, subject: str, content: str):
-        """
-        Simula o envio de um e-mail (Log no console).
-        Em produção, aqui entraria a lib aiosmtplib ou boto3.
-        """
-        logger.info(f"--- [MOCK EMAIL SENT] ---")
-        logger.info(f"To: {to}")
-        logger.info(f"From: {self.sender}")
-        logger.info(f"Subject: {subject}")
-        logger.info(f"Body: {content}")
-        logger.info(f"-------------------------")
+        try:
+            # Configuração da Mensagem
+            msg = MIMEMultipart()
+            msg['From'] = settings.SMTP_USER
+            msg['To'] = to_email
+            msg['Subject'] = subject
+            msg.attach(MIMEText(html_content, 'html'))
 
-    def send_order_confirmation(self, user: models.User, order: models.Order):
-        subject = f"Cida Joias - Pedido #{order.id} Recebido!"
-        content = f"""
-        Olá, {user.email}!
+            # Conexão com Servidor
+            server = smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT)
+            server.starttls() # Segurança
+            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            server.send_message(msg)
+            server.quit()
+            print(f"E-mail enviado com sucesso para {to_email}")
+        except Exception as e:
+            print(f"Falha ao enviar e-mail: {str(e)}")
+
+    def send_order_status_update(self, order: Order, user: User, new_status: OrderStatus):
+        """
+        Gera o texto do e-mail baseado no novo status e envia.
+        """
+        subject = f"Atualização do Pedido #{order.id} - {settings.PROJECT_NAME}"
         
-        Recebemos seu pedido #{order.id}.
-        Total: R$ {order.total_amount:.2f}
+        # Templates simples baseados no status
+        status_messages = {
+            OrderStatus.SHIPPED: "Boas notícias! Seu pedido foi <b>ENVIADO</b> e está a caminho.",
+            OrderStatus.DELIVERED: "Seu pedido foi <b>ENTREGUE</b>! Esperamos que ame suas joias.",
+            OrderStatus.CANCELLED: "Seu pedido foi <b>CANCELADO</b>. Se houve cobrança, o estorno será processado.",
+            OrderStatus.PROCESSING: "Seu pedido está sendo <b>PROCESSADO</b> e separado com carinho.",
+            OrderStatus.PAID: "Pagamento confirmado! Estamos preparando seu pedido."
+        }
         
-        Estamos aguardando a confirmação do pagamento.
-        """
-        self.send_email(user.email, subject, content)
+        message_body = status_messages.get(new_status, f"O status do seu pedido mudou para: {new_status.value}")
 
-    def send_payment_confirmation(self, user: models.User, order: models.Order):
-        subject = f"Cida Joias - Pagamento Aprovado (Pedido #{order.id})"
-        content = f"""
-        Tudo certo, {user.email}!
-        
-        O pagamento do seu pedido #{order.id} foi aprovado.
-        Em breve enviaremos o código de rastreio.
+        # HTML Básico
+        html_content = f"""
+        <html>
+            <body>
+                <h2>Olá, {user.name}!</h2>
+                <p>{message_body}</p>
+                <hr>
+                <p><b>Detalhes do Pedido:</b> #{order.id}</p>
+                <p><b>Valor Total:</b> R$ {order.total_amount}</p>
+                <br>
+                <p>Obrigado por escolher a Cida Joias!</p>
+            </body>
+        </html>
         """
-        self.send_email(user.email, subject, content)
 
-# Singleton
+        self._send_email_sync(user.email, subject, html_content)
+
+# Instância global
 email_service = EmailService()

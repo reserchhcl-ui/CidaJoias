@@ -11,8 +11,13 @@ class Settings(BaseSettings):
     # Permite ler do arquivo .env e ignora variáveis extras não mapeadas
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
-    EMAILS_ENABLED: bool = True
-    EMAIL_FROM: str = "noreply@cidajoias.com"
+    # Configurações de E-mail
+    SMTP_SERVER: str = "smtp.gmail.com" # Exemplo Gmail
+    SMTP_PORT: int = 587
+    SMTP_USER: str = "seu_email@gmail.com"
+    SMTP_PASSWORD: str = "sua_senha_de_app" # Crie uma "App Password" no Google
+    EMAILS_ENABLED: bool = True # Mude para False para apenas testar no console
+
     # --- Identidade da API ---
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "Cida Joias E-commerce"

@@ -3,7 +3,7 @@
 from sqlalchemy.orm import Session, joinedload
 from decimal import Decimal
 from typing import List, Optional
-from sqlalchemy import and_, desc
+from sqlalchemy import and_, desc,or_
 from .base import CRUDBase
 from .. import models, schemas
 
@@ -11,48 +11,60 @@ from .. import models, schemas
 class CRUDOrder(CRUDBase[models.Order, schemas.OrderCreate, schemas.OrderCreate]):
     
     def get_multi_filtered(
-        self, 
-        db: Session, 
-        *, 
-        filter_params: schemas.OrderFilter,
-        skip: int = 0, 
-        limit: int = 100
-    ) -> List[models.Order]:
-        """
-        Busca avançada para o Backoffice (Admin).
-        Permite filtrar por status, cliente, data, etc.
-        """
-        query = db.query(self.model)
+            self, 
+            db: Session, 
+            *, 
+            filters: schemas.OrderFilter, 
+            skip: int = 0, 
+            limit: int = 50
+        ) -> List[models.Order]:
+            """
+            Busca Admin: Filtra por tudo e traz dados completos (User + Address + Items + Products)
+            """
+            query = db.query(self.model)
 
-        # Joins necessários para filtros (ex: email do usuário)
-        if filter_params.user_email:
-            query = query.join(models.User).filter(models.User.email.ilike(f"%{filter_params.user_email}%"))
+            # 1. Joins para permitir busca por dados do Usuário
+            query = query.join(models.User)
 
-        # Filtros diretos
-        if filter_params.status:
-            query = query.filter(self.model.status == filter_params.status)
-        
-        if filter_params.payment_status:
-            query = query.filter(self.model.payment_status == filter_params.payment_status)
-            
-        if filter_params.date_start:
-            query = query.filter(self.model.created_at >= filter_params.date_start)
-            
-        if filter_params.date_end:
-            query = query.filter(self.model.created_at <= filter_params.date_end)
+            # 2. Aplicação dos Filtros
+            if filters.order_id:
+                query = query.filter(self.model.id == filters.order_id)
+                
+            if filters.search_term:
+                term = f"%{filters.search_term}%"
+                # Busca por Nome do Cliente OU Email do Cliente
+                query = query.filter(
+                    or_(
+                        models.User.name.ilike(term),
+                        models.User.email.ilike(term)
+                    )
+                )
 
-        # Ordenação e Eager Loading (Trazer itens e dono junto)
-        return (
-            query
-            .options(
-                joinedload(self.model.items).joinedload(models.OrderItem.product),
-                joinedload(self.model.owner)
+            if filters.status:
+                query = query.filter(self.model.status == filters.status)
+                
+            if filters.payment_status:
+                query = query.filter(self.model.payment_status == filters.payment_status)
+
+            if filters.date_start:
+                query = query.filter(self.model.created_at >= filters.date_start)
+                
+            if filters.date_end:
+                query = query.filter(self.model.created_at <= filters.date_end)
+
+            # 3. Eager Loading (Trazer tudo numa query só para performance)
+            return (
+                query
+                .options(
+                    joinedload(self.model.items).joinedload(models.OrderItem.product), # Traz itens e produtos
+                    joinedload(self.model.shipping_address), # Traz endereço
+                    joinedload(self.model.owner) # Traz dados do Cliente (NOVO)
+                )
+                .order_by(self.model.created_at.desc()) # Mais recentes primeiro
+                .offset(skip)
+                .limit(limit)
+                .all()
             )
-            .order_by(desc(self.model.created_at)) # Mais recentes primeiro
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
 
     def create_order_in_db(self, db: Session, *, user: models.User, order_create: schemas.OrderCreate) -> models.Order:
         """

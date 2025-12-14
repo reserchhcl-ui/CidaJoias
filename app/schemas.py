@@ -182,10 +182,10 @@ class OrderResponse(BaseModel):
     
     # Valores
     subtotal: Decimal
-    applied_discount: Decimal = Decimal(0)
+    applied_discount: Decimal = Decimal(0.0)
     
     # --- NOVOS CAMPOS ---
-    shipping_cost: Decimal = Decimal(0) # Custo do Frete
+    shipping_cost: Decimal = Decimal(0.0) # Custo do Frete
     total_amount: Decimal
     
     payment_status: Optional[PaymentStatus] = None
@@ -198,6 +198,8 @@ class OrderResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class OrderFilter(BaseModel):
+    order_id: Optional[int] = None      # Busca exata por ID
+    search_term: Optional[str] = None
     status: Optional[OrderStatus] = None
     payment_status: Optional[PaymentStatus] = None
     user_email: Optional[str] = None # Buscar por cliente
@@ -208,7 +210,7 @@ class OrderUpdate(BaseModel):
     status: Optional[OrderStatus] = None
     payment_status: Optional[PaymentStatus] = None
     transaction_id: Optional[str] = None
-    # Futuro: tracking_code: Optional[str] = None
+    tracking_code: Optional[str] = None
 
 class SalesCaseItemResponse(BaseModel):
     product_id: int
