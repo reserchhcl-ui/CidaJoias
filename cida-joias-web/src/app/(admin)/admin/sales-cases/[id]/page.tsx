@@ -1,201 +1,148 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, ArrowLeft, Calendar, User, Check, Trash2, AlertCircle } from 'lucide-react';
-import { format } from 'date-fns';
+import { Loader2, Plus, Save, Trash, PackageOpen } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-
-import { SalesCaseItemManager } from '@/components/admin/SalesCaseItemManager';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { salesCaseService } from '@/services/sales-case-service';
-import { productService } from '@/services/product-service';
-import { userService } from '@/services/user-service';
+import { getImageUrl } from '@/lib/utils';
 
-export default function EditSalesCasePage() {
-  const router = useRouter();
-  const params = useParams();
-  const caseId = Number(params.id);
+export default function AdminCaseDetails() {
+  const { id } = useParams();
+  const caseId = Number(id);
   const queryClient = useQueryClient();
-  
-  // Estado para o modal de exclusão do estojo
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  // 1. Dados do Estojo
-  const { data: salesCase, isLoading: isLoadingCase } = useQuery({
-    queryKey: ['sales-case', caseId],
-    queryFn: () => salesCaseService.getCaseById(caseId),
-    enabled: !!caseId,
+  // Inputs para adicionar novo item
+  const [newProductId, setNewProductId] = useState('');
+  const [newQuantity, setNewQuantity] = useState('1');
+
+  const { data: salesCase, isLoading } = useQuery({
+    queryKey: ['admin-case', caseId],
+    queryFn: () => salesCaseService.getCaseAdminById(caseId),
   });
 
-  // 2. Catálogo Completo (para o Manager resolver nomes/fotos)
-  const { data: allProducts, isLoading: isLoadingProducts } = useQuery({
-    queryKey: ['admin-products-full'],
-    queryFn: () => productService.getProducts(0, 2000),
-  });
-
-  // 3. Usuários (para nome da vendedora)
-  const { data: users } = useQuery({
-    queryKey: ['admin-users'],
-    queryFn: userService.getAllUsers,
-  });
-
-  // Mutação: Excluir Estojo Inteiro
-  const deleteCaseMutation = useMutation({
-    mutationFn: () => salesCaseService.deleteCase(caseId),
+  // Mutação: Adicionar Item
+  const addItemMutation = useMutation({
+    mutationFn: () => salesCaseService.addItem(caseId, Number(newProductId), Number(newQuantity)),
     onSuccess: () => {
-      toast.success("Estojo excluído e itens devolvidos ao estoque.");
-      queryClient.invalidateQueries({ queryKey: ['admin-cases'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-products'] }); // Estoque mudou
-      router.push('/admin/sales-cases');
+      queryClient.invalidateQueries({ queryKey: ['admin-case', caseId] });
+      toast.success("Item adicionado!");
+      setNewProductId('');
+      setNewQuantity('1');
     },
-    onError: (error: any) => {
-      const msg = error.response?.data?.detail || "Erro ao excluir estojo.";
-      toast.error(msg);
+    onError: () => toast.error("Erro ao adicionar (Verifique ID ou Estoque).")
+  });
+
+  // Mutação: Editar Quantidade (0 remove)
+  const updateItemMutation = useMutation({
+    mutationFn: ({ pId, qtd }: { pId: number, qtd: number }) => 
+      salesCaseService.updateItemQuantity(caseId, pId, qtd),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-case', caseId] });
+      toast.success("Quantidade atualizada.");
     }
   });
 
-  // Handler de Conclusão (Apenas sai da página)
-  const handleFinish = () => {
-    queryClient.invalidateQueries({ queryKey: ['admin-cases'] });
-    toast.success("Edição concluída.");
-    router.push('/admin/sales-cases');
-  };
-
-  const isLoading = isLoadingCase || isLoadingProducts;
-
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <span className="ml-3 text-slate-500">Carregando gerenciador...</span>
-      </div>
-    );
-  }
-
-  if (!salesCase) return <div className="p-10 text-center text-red-500">Estojo não encontrado.</div>;
-
-  const salesRepName = users?.find(u => u.id === salesCase.sales_rep_id)?.full_name || `ID: ${salesCase.sales_rep_id}`;
-  const totalItems = salesCase.items.reduce((acc, item) => acc + item.quantity, 0);
+  if (isLoading || !salesCase) return <Loader2 className="animate-spin mx-auto mt-10" />;
 
   return (
-    <div className="space-y-6 pb-28">
-      
-      {/* Cabeçalho */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => router.back()}>
-                <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-                    Gerenciar Estojo #{salesCase.id}
-                </h1>
-                <div className="flex items-center gap-2 mt-1">
-                    <Badge variant={salesCase.status === 'on_loan' ? 'secondary' : 'outline'}>
-                        {salesCase.status === 'on_loan' ? 'Emprestado' : salesCase.status}
-                    </Badge>
-                    <span className="text-sm text-slate-500">Criado em {format(new Date(salesCase.loan_date), "dd/MM/yyyy")}</span>
-                </div>
-            </div>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+            <h1 className="text-2xl font-bold">Estojo: {salesCase.code}</h1>
+            <p className="text-slate-500">Vendedora ID: {salesCase.sales_rep_id} • Status: {salesCase.status}</p>
         </div>
-
-        {/* Botão de Perigo (Excluir Estojo) */}
-        <Button  
-            variant="outline" 
-            className="text-red-500 hover:bg-red-50 hover:text-red-700"
-            onClick={() => setIsDeleteDialogOpen(true)}
-        >
-            <Trash2 className="mr-2 h-4 w-4" /> Excluir Estojo
-        </Button>
       </div>
 
-      {/* Info Card (Resumo) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-4 rounded-lg border shadow-sm">
-            <div className="flex items-center gap-3">
-                <div className="bg-purple-100 p-2 rounded-full text-purple-600">
-                    <User className="h-5 w-5" />
+      <div className="grid md:grid-cols-3 gap-6">
+        
+        {/* COLUNA 1: ADICIONAR PRODUTOS */}
+        <Card className="h-fit">
+            <CardHeader><CardTitle className="text-base">Adicionar Produto</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+                <div className="space-y-2">
+                    <label className="text-sm font-medium">ID do Produto</label>
+                    <Input 
+                        placeholder="Ex: 50" 
+                        value={newProductId} 
+                        onChange={e => setNewProductId(e.target.value)} 
+                    />
                 </div>
-                <div>
-                    <p className="text-xs text-slate-500">Vendedora</p>
-                    <p className="font-semibold">{salesRepName}</p>
+                <div className="space-y-2">
+                    <label className="text-sm font-medium">Quantidade</label>
+                    <Input 
+                        type="number" 
+                        min={1} 
+                        value={newQuantity} 
+                        onChange={e => setNewQuantity(e.target.value)} 
+                    />
                 </div>
-            </div>
-            <div className="flex items-center gap-3">
-                <div className="bg-blue-100 p-2 rounded-full text-blue-600">
-                    <Calendar className="h-5 w-5" />
+                <Button 
+                    className="w-full" 
+                    onClick={() => addItemMutation.mutate()}
+                    disabled={addItemMutation.isPending || !newProductId}
+                >
+                    {addItemMutation.isPending ? <Loader2 className="animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                    Adicionar ao Estojo
+                </Button>
+            </CardContent>
+        </Card>
+
+        {/* COLUNA 2: LISTA DE ITENS */}
+        <Card className="md:col-span-2">
+            <CardHeader><CardTitle>Conteúdo Atual ({salesCase.items.length} itens)</CardTitle></CardHeader>
+            <CardContent>
+                <div className="space-y-4">
+                    {salesCase.items.map((item) => (
+                        <div key={item.product_id} className="flex items-center justify-between border-b pb-4 last:border-0">
+                            <div className="flex items-center gap-4">
+                                <div className="h-12 w-12 bg-slate-100 rounded border overflow-hidden flex items-center justify-center">
+                                    {item.product?.image_url ? (
+                                        <img src={getImageUrl(item.product.image_url)} className="h-full w-full object-cover" />
+                                    ) : (
+                                        <PackageOpen className="h-5 w-5 text-slate-300" />
+                                    )}
+                                </div>
+                                <div>
+                                    <p className="font-medium text-sm">{item.product?.name || `Produto #${item.product_id}`}</p>
+                                    <p className="text-xs text-slate-500">ID: {item.product_id}</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <Input 
+                                    type="number" 
+                                    className="w-16 h-8 text-center" 
+                                    defaultValue={item.quantity}
+                                    onBlur={(e) => {
+                                        const val = Number(e.target.value);
+                                        if (val !== item.quantity) {
+                                            updateItemMutation.mutate({ pId: item.product_id, qtd: val });
+                                        }
+                                    }}
+                                />
+                                <Button 
+                                    variant="ghost" size="icon" className="text-red-500 hover:bg-red-50"
+                                    onClick={() => updateItemMutation.mutate({ pId: item.product_id, qtd: 0 })}
+                                    title="Remover do estojo"
+                                >
+                                    <Trash className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    ))}
+                    {salesCase.items.length === 0 && (
+                        <p className="text-center text-slate-500 py-4">Estojo vazio.</p>
+                    )}
                 </div>
-                <div>
-                    <p className="text-xs text-slate-500">Data de Retorno</p>
-                    <p className="font-semibold">{format(new Date(salesCase.return_by_date), "dd/MM/yyyy")}</p>
-                </div>
-            </div>
-            <div className="flex items-center gap-3">
-                <div className="bg-green-100 p-2 rounded-full text-green-600">
-                    <span className="font-bold text-lg px-1">{totalItems}</span>
-                </div>
-                <div>
-                    <p className="text-xs text-slate-500">Total de Peças</p>
-                    <p className="font-semibold text-green-700">Itens no Estojo</p>
-                </div>
-            </div>
+            </CardContent>
+        </Card>
       </div>
-
-      {/* Gerenciador de Itens (Adicionar/Remover Peças) */}
-      <SalesCaseItemManager salesCase={salesCase} allProducts={allProducts || []} />
-
-      {/* Rodapé Fixo de Ação */}
-      <div className="fixed bottom-0 left-0 md:left-64 right-0 p-4 bg-white border-t flex justify-end gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-10">
-          <Button variant="outline" onClick={() => router.push('/admin/sales-cases')}>
-             Voltar para Lista
-          </Button>
-          <Button onClick={handleFinish} className="bg-green-600 hover:bg-green-700 w-full md:w-auto px-8">
-             <Check className="mr-2 h-4 w-4" /> Concluir Edição
-          </Button>
-      </div>
-
-      {/* Modal de Confirmação de Exclusão do Estojo */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
-                <AlertCircle className="h-5 w-5" /> Excluir Estojo #{caseId}?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação é irreversível.
-              <br/><br/>
-              Todos os <b>{totalItems} itens</b> listados neste estojo serão <b>devolvidos automaticamente ao estoque</b> da loja.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteCaseMutation.isPending}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction 
-                onClick={(e) => {
-                    e.preventDefault();
-                    deleteCaseMutation.mutate();
-                }}
-                className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
-                disabled={deleteCaseMutation.isPending}
-            >
-                {deleteCaseMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sim, Excluir e Estornar"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
     </div>
   );
 }

@@ -215,7 +215,8 @@ class OrderUpdate(BaseModel):
 class SalesCaseItemResponse(BaseModel):
     product_id: int
     quantity: int
-
+    product: Optional[ProductSummary] = None # Include fotos e nomes!
+    
     model_config = ConfigDict(from_attributes=True)
 
 class SalesCaseResponse(BaseModel):
@@ -224,7 +225,7 @@ class SalesCaseResponse(BaseModel):
     loan_date: datetime
     return_by_date: datetime
     status: str # O Enum será convertido para string
-    items: List[SalesCaseItemResponse] = []
+    items: List[SalesCaseItemResponse] = [] 
     # Poderíamos incluir detalhes da vendedora aqui se quiséssemos
     # sales_rep: User 
 

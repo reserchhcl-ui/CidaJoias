@@ -54,7 +54,6 @@ export default function CartPage() {
     setIsMounted(true);
   }, []);
 
-  // --- CORREÇÃO: FUNÇÃO MOVIDA PARA CIMA DO USEEFFECT ---
   const handleSimulateShipping = async (cepToUse?: string) => {
     const code = cepToUse || zipCode;
     

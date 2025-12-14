@@ -15,7 +15,8 @@ from .routers import (products,
                       users, 
                       orders,
                       orders_admin, 
-                      sales_cases, 
+                      sales_cases,
+                      sales_cases_admin, 
                       discounts, 
                       recommendations, 
                       categories, 
@@ -92,6 +93,7 @@ api_router.include_router(orders_admin.router)
 api_router.include_router(categories.router)
 api_router.include_router(orders.router)
 api_router.include_router(sales_cases.router)
+api_router.include_router(sales_cases_admin.router)
 api_router.include_router(discounts.router)
 api_router.include_router(coupons.router)
 api_router.include_router(recommendations.router)

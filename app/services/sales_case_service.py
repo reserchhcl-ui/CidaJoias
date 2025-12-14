@@ -1,11 +1,14 @@
 # app/services/sales_case_service.py
-
+import os
+import io
+import zipfile
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from typing import List
 from .. import models, schemas, crud
 from ..models import UserRole, SalesCaseStatus
-
+from fastapi import HTTPException
+from fastapi.responses import StreamingResponse
 # Exceções customizadas
 class SalesCaseLogicError(ValueError): pass
 class SalesCaseAuthorizationError(PermissionError): pass
@@ -255,3 +258,50 @@ class SalesCaseService:
             except Exception as e:
                 self.db.rollback()
                 raise SalesCaseLogicError(f"Error deleting sales case: {str(e)}")
+            
+    def generate_marketing_pack(self, case_id: int, user_id: int) -> StreamingResponse:
+        """
+        Gera um arquivo ZIP com as fotos dos produtos do estojo para a vendedora.
+        """
+        # 1. Buscar Estojo
+        case = self.db.query(models.SalesCase).get(case_id)
+        if not case:
+            raise SalesCaseLogicError("Estojo não encontrado")
+        
+        # 2. Segurança
+        if case.sales_rep_id != user_id:
+             raise SalesCaseAuthorizationError("Este estojo não pertence a você.")
+
+        # 3. Criar ZIP em Memória
+        zip_buffer = io.BytesIO()
+        files_added = 0
+
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            for item in case.items:
+                product = item.product
+                
+                # Verifica se o produto tem imagem e se o arquivo existe no disco
+                if product.image_url:
+                    # Lógica de Caminho: Ajuste conforme sua pasta de uploads ('uploads/', 'static/', etc)
+                    # Exemplo: Se image_url for "/static/img.jpg", removemos a barra inicial
+                    relative_path = product.image_url.lstrip("/")
+                    file_path = os.path.abspath(relative_path) 
+
+                    if os.path.exists(file_path):
+                        # Nome bonito para o arquivo: "Brinco de Ouro.jpg"
+                        ext = os.path.splitext(file_path)[1]
+                        sanitized_name = "".join([c for c in product.name if c.isalnum() or c in (' ', '-')]).strip()
+                        archive_name = f"{sanitized_name}{ext}"
+                        
+                        zip_file.write(file_path, archive_name)
+                        files_added += 1
+
+        if files_added == 0:
+            raise SalesCaseLogicError("Nenhum produto neste estojo possui imagem cadastrada para download.")
+
+        zip_buffer.seek(0)
+        
+        headers = {
+            'Content-Disposition': f'attachment; filename="Marketing_Estojo_{case.code}.zip"'
+        }
+        return StreamingResponse(iter([zip_buffer.getvalue()]), media_type="application/zip", headers=headers)

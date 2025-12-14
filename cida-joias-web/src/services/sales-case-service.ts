@@ -1,66 +1,84 @@
+// src/services/sales-case-service.ts
 import api from '@/lib/api';
-import { SalesCase } from '@/types/dashboard';
+import { SalesCase, CreateCaseDTO } from '@/types/sales-case';
 
-export interface SalesCaseItemCreate {
-  product_id: number;
-  quantity: number;
-}
-
-export interface CreateSalesCaseDTO {
-  sales_rep_id: number;
-  loan_duration_days: number;
-  items: SalesCaseItemCreate[];
-}
-
-export interface AddCaseItemDTO {
-  product_id?: number | null;
-  barcode?: string;
-  quantity: number;
-}
-
-export interface UpdateCaseItemDTO {
-  quantity: number;
-}
+const ADMIN_URI = '/backoffice/sales-cases';
+const REP_URI = '/sales-cases';
 
 export const salesCaseService = {
-  // Listar todos
-  getAllCases: async (status?: 'on_loan' | 'returned' | 'overdue'): Promise<SalesCase[]> => {
-    // Monta a query string se houver status
-    const query = status ? `?status=${status}` : '';
-    const response = await api.get<SalesCase[]>(`/sales-cases/${query}`);
+  // --- ÁREA DO ADMIN (BACKOFFICE) ---
+
+  getAllCasesAdmin: async (status?: string): Promise<SalesCase[]> => {
+    const params = status ? { status } : {};
+    const response = await api.get<SalesCase[]>(ADMIN_URI, { params });
     return response.data;
   },
 
-  // Buscar por ID (Detalhes/Edição)
-  getCaseById: async (id: number): Promise<SalesCase> => {
-    const response = await api.get<SalesCase>(`/sales-cases/${id}`);
+  getCaseAdminById: async (id: number): Promise<SalesCase> => {
+    const response = await api.get<SalesCase>(`${ADMIN_URI}/${id}`);
     return response.data;
   },
 
-  // Criar
-  createCase: async (data: CreateSalesCaseDTO): Promise<SalesCase> => {
-    const response = await api.post<SalesCase>('/sales-cases/', data);
+  createCase: async (data: CreateCaseDTO): Promise<SalesCase> => {
+    const response = await api.post<SalesCase>(ADMIN_URI, data);
     return response.data;
   },
 
-  // Atualizar (PUT)
-  // Nota: O backend precisa suportar PUT /sales-cases/{id} com o mesmo payload de criação
-  updateCase: async (id: number, data: CreateSalesCaseDTO): Promise<SalesCase> => {
-    const response = await api.put<SalesCase>(`/sales-cases/${id}`, data);
-    return response.data;
-  },
-  addItem: async (caseId: number, data: AddCaseItemDTO): Promise<SalesCase> => {
-    const response = await api.post<SalesCase>(`/sales-cases/${caseId}/items`, data);
-    return response.data;
-  },
-
-  // 2. ATUALIZAR/REMOVER ITEM
-  updateItemQuantity: async (caseId: number, productId: number, quantity: number): Promise<SalesCase> => {
-    const response = await api.put<SalesCase>(`/sales-cases/${caseId}/items/${productId}`, { quantity });
-    return response.data;
-  },
-  
   deleteCase: async (id: number): Promise<void> => {
-    await api.delete(`/sales-cases/${id}`);
+    await api.delete(`${ADMIN_URI}/${id}`);
   },
+
+  addItem: async (caseId: number, productId: number, quantity: number) => {
+    const response = await api.post(`${ADMIN_URI}/${caseId}/items`, {
+      product_id: productId,
+      quantity
+    });
+    return response.data;
+  },
+
+  updateItemQuantity: async (caseId: number, productId: number, quantity: number) => {
+    const response = await api.put(`${ADMIN_URI}/${caseId}/items/${productId}`, {
+      quantity
+    });
+    return response.data;
+  },
+
+  // --- ÁREA DA VENDEDORA (APP) ---
+
+  getMyCases: async (): Promise<SalesCase[]> => {
+    const response = await api.get<SalesCase[]>(`${REP_URI}/meus-estojos`);
+    return response.data;
+  },
+
+  getCaseDetails: async (id: number): Promise<SalesCase> => {
+    const response = await api.get<SalesCase>(`${REP_URI}/${id}`);
+    return response.data;
+  },
+
+  // Lógica de Download (BLOB)
+  downloadMarketingPack: async (caseId: number, caseCode: string) => {
+    try {
+        const response = await api.get(`${REP_URI}/${caseId}/marketing-pack`, {
+            responseType: 'blob', // Crucial para arquivos binários
+        });
+
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Midia_${caseCode}.zip`); // Nome do arquivo
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url); // Limpa memória
+        return true;
+    } catch (error) {
+        console.error("Erro no download", error);
+        throw error;
+    }
+  },
+
+  returnCase: async (id: number, itemsReturned: {product_id: number, quantity: number}[]) => {
+    const response = await api.post(`${REP_URI}/${id}/return`, { items_returned: itemsReturned });
+    return response.data;
+  }
 };
